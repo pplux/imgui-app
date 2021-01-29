@@ -1,0 +1,6 @@
+[submodule "imgui"]
+	path = imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "sokol"]
+	path = sokol
+	url = https://github.com/floooh/sokol.git
