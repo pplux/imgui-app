@@ -2,6 +2,8 @@
 
 Imgui-app is an amalgamation of two amazing projects [Dear Imgui](https://github.com/ocornut/imgui) and [Sokol libraries](https://github.com/floooh/sokol) into **two** files to make it very easy to start working with imgui. It might be useful when you need to do some UI quickly for a project but do not want to care that much how to get imgui up and running (imgui compilation, backend rendering, window handling, ...). 
 
+![test.png](https://github.com/pplux/imgui-app/blob/main/example/test.png?raw=true)
+
 # Howto
 
 To start using imgui-app you need to add these two files to your project:
