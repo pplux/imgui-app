@@ -40,6 +40,7 @@ imgui.h: src/imgui_app.h imgui/imgui.h header.txt
 	@cat imgui/imgui.h >> $@
 
 imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp 
+	@rm -f $@
 	@cat header.txt > $@
 	@echo "#define SOKOL_IMPL\n#define SOKOL_NO_ENTRY\n\n" >> $@
 	@echo "#define SOKOL_IMPL\n#define SOKOL_WIN32_FORCE_MAIN\n\n" >> $@

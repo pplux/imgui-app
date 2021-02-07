@@ -10,6 +10,8 @@ void imgui_app(
     void (*frame_func)(),
     const char *window_title = "IMGUI APP",
     int width = 800,
-    int height = 600);
+    int height = 600,
+    int ImGuiConfigFlags = 0
+    );
 //
 // ----------------------------------------------------------------------------

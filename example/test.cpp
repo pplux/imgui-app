@@ -21,6 +21,8 @@ int main(int, char **) {
     buf[0] = 0;
     f = 0.0f;
     // when ready start the UI (this will not return until the app finishes)
-    imgui_app(frame);    
+    int imguiConfigFlags = 0;
+    // imguiConfigFlags = ImGuiConfigFlags_DockingEnable // (if you use the docking branch)
+    imgui_app(frame, "IMGUI_APP", 800, 600, imguiConfigFlags);    
     return 0;
 }

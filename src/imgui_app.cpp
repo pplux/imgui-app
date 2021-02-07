@@ -4,6 +4,7 @@ static struct {
     uint64_t laptime;
     sg_pass_action pass_action;
     void (*frame_fn)();
+    ImGuiConfigFlags config_flags;
 } state = {};
 
 static void init(void) {
@@ -14,11 +15,13 @@ static void init(void) {
     simgui_desc_t desc_imgui = {};
     simgui_setup(&desc_imgui);
 
+    ImGui::GetIO().ConfigFlags = state.config_flags;
+
     state.pass_action.colors[0].action = SG_ACTION_CLEAR;
-    state.pass_action.colors[0].val[0] = 0.12f;
-    state.pass_action.colors[0].val[1] = 0.12f;
-    state.pass_action.colors[0].val[2] = 0.12f;
-    state.pass_action.colors[0].val[3] = 1.0f;
+    state.pass_action.colors[0].value.r = 0.12f;
+    state.pass_action.colors[0].value.g = 0.12f;
+    state.pass_action.colors[0].value.b = 0.12f;
+    state.pass_action.colors[0].value.a = 1.0f;
 }
 
 static void frame(void) {
@@ -44,8 +47,9 @@ static void event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 
-void imgui_app(void (*frame_func)(), const char *window_title, int width, int height) {
+void imgui_app(void (*frame_func)(), const char *window_title, int width, int height, int config) {
     state.frame_fn = frame_func;
+    state.config_flags = config;
     sapp_desc desc = {};
     desc.init_cb = init;
     desc.frame_cb = frame;
