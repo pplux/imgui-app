@@ -9,8 +9,11 @@ CPP += imgui/imgui_demo.cpp
 CPP += imgui/imgui.cpp
 CPP += sokol/util/sokol_imgui.h
 
+TGZ=imgui_app_$(shell cd imgui; git describe --tags).tgz
 
-imgui_app.tgz: imgui.h imgui_app.cpp
+
+$(TGZ): imgui.h imgui_app.cpp README.md
+	@echo "Creating $(TGZ)"
 	@tar -cvzf $@ $^
 
 .PHONY: header.txt clean
