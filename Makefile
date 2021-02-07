@@ -24,14 +24,15 @@ header.txt: imgui sokol
 	@echo "// ----------------------------------------------------------------------------" >> $@
 
 imgui.h: src/imgui_app.h imgui/imgui.h header.txt
-	@cat header.txt >> $@
+	@cat header.txt > $@
 	@cat src/imgui_app.h >> $@
 	@echo "#define IMGUI_DISABLE_INCLUDE_IMCONFIG_H\n" >> $@
 	@cat imgui/imgui.h >> $@
 
 imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp 
-	@cat header.txt >> $@
+	@cat header.txt > $@
 	@echo "#define SOKOL_IMPL\n#define SOKOL_NO_ENTRY\n\n" >> $@
+	@echo "#define SOKOL_IMPL\n#define SOKOL_WIN32_FORCE_MAIN\n\n" >> $@
 	@cat $(CPP) >> $@
 # imgui_internal, only replace the first time, remove the other includes
 	@sed -e '0,/#include "imgui_internal.h"/{ /#include "imgui_internal.h"/{' -e 'r imgui/imgui_internal.h' -e 'd' -e '}}' -i $@

@@ -10,6 +10,10 @@
 #define SOKOL_NO_ENTRY
 
 
+#define SOKOL_IMPL
+#define SOKOL_WIN32_FORCE_MAIN
+
+
 #if defined(SOKOL_IMPL) && !defined(SOKOL_APP_IMPL)
 #define SOKOL_APP_IMPL
 #endif
