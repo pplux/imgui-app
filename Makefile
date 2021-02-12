@@ -13,13 +13,13 @@ VERSION=$(shell cd imgui; git describe --tags)
 TGZ=imgui_app_$(VERSION).tgz
 ZIP=imgui_app_$(VERSION).zip
 
-all: $(TGZ) $(ZIP)
+all: $(TGZ) $(ZIP) 
 
-$(TGZ): imgui.h imgui_app.cpp README.md
+$(TGZ): imgui.h imgui_app.cpp imgui_internal.h README.md
 	@echo "Creating $(TGZ)"
 	@tar -cvzf $@ $^
 
-$(ZIP): imgui.h imgui_app.cpp README.md
+$(ZIP): imgui.h imgui_app.cpp imgui_internal.h README.md
 	@echo "Creating $(TGZ)"
 	@zip $@ $^
 
@@ -40,7 +40,6 @@ imgui.h: src/imgui_app.h imgui/imgui.h header.txt
 	@cat imgui/imgui.h >> $@
 
 imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp 
-	@rm -f $@
 	@cat header.txt > $@
 	@echo "#define SOKOL_IMPL\n#define SOKOL_NO_ENTRY\n\n" >> $@
 	@echo "#define SOKOL_IMPL\n#define SOKOL_WIN32_FORCE_MAIN\n\n" >> $@
@@ -54,6 +53,11 @@ imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp
 	@sed -e '/#include "imstb_truetype.h"/ {' -e 'r imgui/imstb_truetype.h' -e 'd' -e '}' -i $@
 	@cat src/imgui_app.cpp >> $@
 
+imgui_internal.h: header.txt imgui/imgui_internal.h
+	@cat $+ > $@
+	@sed -e '/#include "imstb_textedit.h"/ {' -e 'r imgui/imstb_textedit.h' -e 'd' -e '}' -i $@
+	@sed -e '/#include "imstb_rectpack.h"/ {' -e 'r imgui/imstb_rectpack.h' -e 'd' -e '}' -i $@
+	@sed -e '/#include "imstb_truetype.h"/ {' -e 'r imgui/imstb_truetype.h' -e 'd' -e '}' -i $@
 
 clean:
 	@rm -f imgui_app.cpp imgui.h imgui_app.tgz header.txt
