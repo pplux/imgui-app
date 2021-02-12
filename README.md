@@ -14,9 +14,11 @@ Once you are ready to display the UI, just call `imgui_app`, see the [example](h
 
 Finally, make sure to select the proper sokol render backend, by compiling your project with `-DSOKOL_GLCORE33` or any of the [available backends](https://github.com/floooh/sokol/blob/master/sokol_gfx.h#L18-L24).
 
+There is an optional third generated file [imgui_internal.h](https://github.com/pplux/imgui-app/blob/main/imgui_internal.h). It is usually not required but maybe you use an advanced 3rd party widget that needs it. This version, as with `imgui.h` can be usued in place of the original one, it also includes all the dependencies.
+
 
 # Notes:
-  * Try not to modify the files `imgui.h` and `imgui_app.cpp` they are generated from the original sources by the `Makefile` of this project
+  * Try not to modify the files `imgui.h`, `imgui_app.cpp`, or `imgui_internal.h` they are generated from the original sources by the `Makefile` of this project
   * We chose to use imgui.h for the headers to make the project compatible with other exisiting imgui code. 
   * imgui_app.cpp is **BIG**, it is the result of including in one file imgui, sokol, and all the dependencies. Try not to compile every time on your project :)
   * The *amalgamation* idea comes from [Sqlite amalgamation](https://www.sqlite.org/amalgamation.html)
