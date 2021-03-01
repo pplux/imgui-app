@@ -47,6 +47,21 @@ static void event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 
+void imgui_app(void (*frame_func)(), void (*config_sokol)(sapp_desc *), int config) {
+    state.frame_fn = frame_func;
+    state.config_flags = config;
+    sapp_desc desc = {};
+    desc.init_cb = init;
+    desc.frame_cb = frame;
+    desc.cleanup_cb = cleanup;
+    desc.event_cb = event;
+    desc.window_title = "IMGUI APP";
+    desc.width = 800;
+    desc.height = 600;
+    config_sokol(&desc);
+    sapp_run(&desc);
+}
+
 void imgui_app(void (*frame_func)(), const char *window_title, int width, int height, int config) {
     state.frame_fn = frame_func;
     state.config_flags = config;
@@ -59,4 +74,25 @@ void imgui_app(void (*frame_func)(), const char *window_title, int width, int he
     desc.width = width;
     desc.height = height;
     sapp_run(&desc);
+}
+
+ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height) {
+    sg_image_desc img_desc;
+    memset(&img_desc, 0, sizeof(img_desc));
+    img_desc.width = width;
+    img_desc.height = height;
+    img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
+    img_desc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.min_filter = SG_FILTER_LINEAR;
+    img_desc.mag_filter = SG_FILTER_LINEAR;
+    img_desc.data.subimage[0][0].ptr = data;
+    img_desc.data.subimage[0][0].size = (size_t)(width * height) * 4;
+    sg_image img = sg_make_image(&img_desc);
+    return (ImTextureID)img.id;
+}
+
+void imgui_app_destroyImage(ImTextureID id) {
+    sg_image img = {(uint32_t) id};
+    sg_destroy_image(img);
 }

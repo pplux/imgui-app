@@ -15,11 +15,11 @@ ZIP=imgui_app_$(VERSION).zip
 
 all: $(TGZ) $(ZIP) 
 
-$(TGZ): imgui.h imgui_app.cpp imgui_internal.h README.md
+$(TGZ): imgui.h imgui_app.cpp imgui_internal.h sokol.h README.md
 	@echo "Creating $(TGZ)"
 	@tar -cvzf $@ $^
 
-$(ZIP): imgui.h imgui_app.cpp imgui_internal.h README.md
+$(ZIP): imgui.h imgui_app.cpp imgui_internal.h sokol.h README.md
 	@echo "Creating $(TGZ)"
 	@zip $@ $^
 
@@ -58,6 +58,9 @@ imgui_internal.h: header.txt imgui/imgui_internal.h
 	@sed -e '/#include "imstb_textedit.h"/ {' -e 'r imgui/imstb_textedit.h' -e 'd' -e '}' -i $@
 	@sed -e '/#include "imstb_rectpack.h"/ {' -e 'r imgui/imstb_rectpack.h' -e 'd' -e '}' -i $@
 	@sed -e '/#include "imstb_truetype.h"/ {' -e 'r imgui/imstb_truetype.h' -e 'd' -e '}' -i $@
+
+sokol.h: header.txt sokol/sokol_app.h sokol/sokol_time.h
+	@cat $+ > $@
 
 clean:
 	@rm -f imgui_app.cpp imgui.h imgui_app.tgz header.txt
