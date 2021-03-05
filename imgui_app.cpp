@@ -4,7 +4,7 @@
 // imgui:
 //    cdf1926f21d17a3d9be7f69434cc18dc65dd6609(Thu Feb 25 20:33:47 2021 +0800)
 // sokol:
-//    4c56a2ee15d81cac91b738bb7e740c964dc6bd56(Sat Feb 27 13:39:57 2021 +0100)
+//    c5d55faa1036af9919bd28400e97d37548bb3789(Thu Mar 4 14:22:49 2021 +0100)
 // ----------------------------------------------------------------------------
 #define SOKOL_IMPL
 #define SOKOL_NO_ENTRY
@@ -11391,7 +11391,7 @@ typedef struct sg_range {
 // disabling this for every includer isn't great, but the warnings are also quite pointless
 #if defined(_MSC_VER)
 #pragma warning(disable:4221)   /* /W4 only: nonstandard extension used: 'x': cannot be initialized using address of automatic variable 'y' */
-#pragma warning(disable:4202)   /* VS2015: nonstandard extension used: non-constant aggregate initializer */
+#pragma warning(disable:4204)   /* VS2015: nonstandard extension used: non-constant aggregate initializer */
 #endif
 #if defined(__cplusplus)
 #define SG_RANGE(x) sg_range{ &x, sizeof(x) }
