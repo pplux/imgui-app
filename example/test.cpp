@@ -34,7 +34,9 @@ int main(int, char **) {
     f = 0.0f;
     // when ready start the UI (this will not return until the app finishes)
     int imguiConfigFlags = 0;
-    // imguiConfigFlags = ImGuiConfigFlags_DockingEnable // (if you use the docking branch)
+    #ifdef IMGUI_HAS_DOCK
+    imguiConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    #endif
     imgui_app(frame, "IMGUI_APP", 800, 600, imguiConfigFlags);    
     return 0;
 }
