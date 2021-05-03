@@ -15,3 +15,6 @@ project "test"
 
    filter "configurations:Release"
       optimize "On"
+
+   configuration "linux"
+      links {"GL","dl", "X11", "Xi", "Xcursor", "pthread"}

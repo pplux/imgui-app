@@ -93,6 +93,6 @@ ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height) {
 }
 
 void imgui_app_destroyImage(ImTextureID id) {
-    sg_image img = {(uint32_t) id};
+    sg_image img = {(uint32_t)(size_t)id};
     sg_destroy_image(img);
 }
