@@ -20,11 +20,12 @@ ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height);
 void imgui_app_destroyImage(ImTextureID id);
 
 // Allows to configure sokol manually/
-//    - Remember to call previous event function if you decide to verride the event callback
+//    - Remember to call previous event function if you decide to override the event callback
+//    - The passed function must return the Imgui config flags (default 0)
 extern "C" {
     struct sapp_desc;
 }
-void imgui_app(void (*frame_func)(), void (*config_sokol)(sapp_desc *), int ImGuiConfigFlags = 0);
+void imgui_app(void (*frame_func)(), int (*config_sokol)(sapp_desc *));
 
 
 

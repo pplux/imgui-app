@@ -12,7 +12,9 @@ static void init(void) {
     desc.context = sapp_sgcontext();
     sg_setup(&desc);
     stm_setup();
+
     simgui_desc_t desc_imgui = {};
+    desc_imgui.dpi_scale = sapp_dpi_scale();
     simgui_setup(&desc_imgui);
 
     ImGui::GetIO().ConfigFlags = state.config_flags;
@@ -47,9 +49,8 @@ static void event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 
-void imgui_app(void (*frame_func)(), void (*config_sokol)(sapp_desc *), int config) {
+void imgui_app(void (*frame_func)(), int (*config_sokol)(sapp_desc *)) {
     state.frame_fn = frame_func;
-    state.config_flags = config;
     sapp_desc desc = {};
     desc.init_cb = init;
     desc.frame_cb = frame;
@@ -58,7 +59,7 @@ void imgui_app(void (*frame_func)(), void (*config_sokol)(sapp_desc *), int conf
     desc.window_title = "IMGUI APP";
     desc.width = 800;
     desc.height = 600;
-    config_sokol(&desc);
+    state.config_flags = config_sokol(&desc);
     sapp_run(&desc);
 }
 
