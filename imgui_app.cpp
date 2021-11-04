@@ -77004,7 +77004,7 @@ SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
 static struct {
     uint64_t laptime;
     sg_pass_action pass_action;
-    void (*frame_fn)();
+    std::function<void()> frame_fn;
     ImGuiConfigFlags config_flags;
 } state = {};
 
@@ -77013,9 +77013,7 @@ static void init(void) {
     desc.context = sapp_sgcontext();
     sg_setup(&desc);
     stm_setup();
-
     simgui_desc_t desc_imgui = {};
-    desc_imgui.dpi_scale = sapp_dpi_scale();
     simgui_setup(&desc_imgui);
 
     ImGui::GetIO().ConfigFlags = state.config_flags;
@@ -77050,8 +77048,9 @@ static void event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 
-void imgui_app(void (*frame_func)(), int (*config_sokol)(sapp_desc *)) {
-    state.frame_fn = frame_func;
+void imgui_app(std::function<void()> &&frame_func, void (*config_sokol)(sapp_desc *), int config) {
+    state.frame_fn = std::move(frame_func);
+    state.config_flags = config;
     sapp_desc desc = {};
     desc.init_cb = init;
     desc.frame_cb = frame;
@@ -77060,12 +77059,12 @@ void imgui_app(void (*frame_func)(), int (*config_sokol)(sapp_desc *)) {
     desc.window_title = "IMGUI APP";
     desc.width = 800;
     desc.height = 600;
-    state.config_flags = config_sokol(&desc);
+    config_sokol(&desc);
     sapp_run(&desc);
 }
 
-void imgui_app(void (*frame_func)(), const char *window_title, int width, int height, int config) {
-    state.frame_fn = frame_func;
+void imgui_app(std::function<void()> &&frame_func, const char *window_title, int width, int height, int config) {
+    state.frame_fn = std::move(frame_func);
     state.config_flags = config;
     sapp_desc desc = {};
     desc.init_cb = init;
@@ -77095,6 +77094,6 @@ ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height) {
 }
 
 void imgui_app_destroyImage(ImTextureID id) {
-    sg_image img = {(uint32_t)(size_t)id};
+    sg_image img = {(uint32_t) id};
     sg_destroy_image(img);
 }

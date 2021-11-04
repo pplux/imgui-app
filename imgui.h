@@ -12,10 +12,12 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <functional>
+
 // Starts the graphical context, and runs the UI. This function will not return 
 // until the app finishes.
 void imgui_app(
-    void (*frame_func)(),
+    std::function<void()> &&frame_func,
     const char *window_title = "IMGUI APP",
     int width = 800,
     int height = 600,
@@ -33,9 +35,7 @@ void imgui_app_destroyImage(ImTextureID id);
 extern "C" {
     struct sapp_desc;
 }
-void imgui_app(void (*frame_func)(), int (*config_sokol)(sapp_desc *));
-
-
+void imgui_app(std::function<void()> &&frame_func, void (*config_sokol)(sapp_desc *), int ImGuiConfigFlags = 0);
 
 //
 // ----------------------------------------------------------------------------
