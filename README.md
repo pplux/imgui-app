@@ -12,10 +12,28 @@ To start using imgui-app you need to add these two files to your project:
      
 Once you are ready to display the UI, just call `imgui_app`, see the [example](https://github.com/pplux/imgui-app/blob/main/example/test.cpp). 
 
+```cpp
+#include "imgui.h"
+
+void frame() {
+    ImGui::Text("Hello, world %d", 123);
+    ImGui::ShowDemoWindow();
+}
+
+int main(int, char **) {
+    // when ready, call the UI:
+    imgui_app(frame, "IMGUI_APP", 800, 600);
+    // execution continues when window is closed
+    return 0;
+}
+```
+
 Finally, make sure to select the proper sokol render backend, by compiling your project with `-DSOKOL_GLCORE33` or any of the [available backends](https://github.com/floooh/sokol/blob/master/sokol_gfx.h#L18-L24).
 
-There is an optional third generated file [imgui_internal.h](https://github.com/pplux/imgui-app/blob/main/imgui_internal.h). It is usually not required but maybe you use an advanced 3rd party widget that needs it. This version, as with `imgui.h` can be usued in place of the original one, it also includes all the dependencies.
-
+# Optional files:
+This files are **not required** to use imgui-app, but if you need access to more advanced components from imgui or sokol here they are:
+   * [imgui_internal.h](https://github.com/pplux/imgui-app/blob/main/imgui_internal.h). Might be needed if you need access to advanced rendering, or you us a 3rd party widget that requires it.
+   * [sokol.h](https://github.com/pplux/imgui-app/blob/main/sokol.h), amalgamation of sokol_app and sokol_time. You might require this if you want to initialize the window manually and provide callbacks for sokol events (input, drag and drop, etc...).
 
 # Notes:
   * Try not to modify the files `imgui.h`, `imgui_app.cpp`, or `imgui_internal.h` they are generated from the original sources by the `Makefile` of this project
