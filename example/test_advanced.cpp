@@ -33,17 +33,18 @@ int main(int, char **) {
     // do any initialization 
     buf[0] = 0;
     f = 0.0f;
+
     // when ready start the UI (this will not return until the app finishes)
-    imgui_app(frame, [](sapp_desc *desc) -> int {
+    int imgui_flags = 0;
+    #ifdef IMGUI_HAS_DOCK
+    imgui_flags = ImGuiConfigFlags_DockingEnable;
+    #endif
+
+    imgui_app(frame, [](sapp_desc *desc) {
         desc->width = 800;
         desc->height = 600;
         desc->window_title = "IMGUI_APP(advanced)";
         desc->high_dpi = false;
-
-        #ifdef IMGUI_HAS_DOCK
-        return ImGuiConfigFlags_DockingEnable;
-        #endif
-        return 0;
-    });
+    }, imgui_flags );
     return 0;
 }

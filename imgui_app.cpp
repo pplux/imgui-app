@@ -79504,10 +79504,10 @@ ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height) {
     img_desc.data.subimage[0][0].ptr = data;
     img_desc.data.subimage[0][0].size = (size_t)(width * height) * 4;
     sg_image img = sg_make_image(&img_desc);
-    return (ImTextureID)img.id;
+    return (ImTextureID)(size_t)img.id;
 }
 
 void imgui_app_destroyImage(ImTextureID id) {
-    sg_image img = {(uint32_t) id};
+    sg_image img = {(uint32_t)(size_t)id};
     sg_destroy_image(img);
 }
