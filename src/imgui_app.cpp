@@ -25,14 +25,15 @@ static void init(void) {
 }
 
 static void frame(void) {
-    const int width = sapp_width();
-    const int height = sapp_height();
-    const double delta_time = stm_sec(stm_round_to_common_refresh_rate(stm_laptime(&state.laptime)));
-    simgui_new_frame(width, height, delta_time);
-
+    const simgui_frame_desc_t new_frame = {
+        sapp_width(),
+        sapp_height(),
+        stm_sec(stm_round_to_common_refresh_rate(stm_laptime(&state.laptime))),
+        sapp_dpi_scale()
+    };
+    simgui_new_frame(new_frame);
     state.frame_fn();
-
-    sg_begin_default_pass(&state.pass_action, width, height);
+    sg_begin_default_pass(&state.pass_action, new_frame.width, new_frame.height);
     simgui_render();
     sg_end_pass();
     sg_commit();
