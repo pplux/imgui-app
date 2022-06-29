@@ -41,6 +41,9 @@ int main(int, char **) {
     #endif
 
     imgui_app(frame, [](sapp_desc *desc) {
+        desc->gl_major_version = 4;
+        desc->gl_minor_version = 6;
+        desc->high_dpi = true;
         desc->width = 800;
         desc->height = 600;
         desc->window_title = "IMGUI_APP(advanced)";
