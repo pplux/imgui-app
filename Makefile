@@ -51,6 +51,7 @@ imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp
 	@sed -e '/#include "imstb_textedit.h"/ {' -e 'r imgui/imstb_textedit.h' -e 'd' -e '}' -i $@
 	@sed -e '/#include "imstb_rectpack.h"/ {' -e 'r imgui/imstb_rectpack.h' -e 'd' -e '}' -i $@
 	@sed -e '/#include "imstb_truetype.h"/ {' -e 'r imgui/imstb_truetype.h' -e 'd' -e '}' -i $@
+	@sed -e 's/#pragma once//' -i $@
 	@cat src/imgui_app.cpp >> $@
 
 imgui_internal.h: header.txt imgui/imgui_internal.h
