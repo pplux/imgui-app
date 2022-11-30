@@ -36,8 +36,8 @@ header.txt: imgui sokol
 imgui.h: src/imgui_app.h imgui/imgui.h header.txt
 	@cat header.txt > $@
 	@cat src/imgui_app.h >> $@
-	@echo "#define IMGUI_DISABLE_INCLUDE_IMCONFIG_H\n" >> $@
 	@cat imgui/imgui.h >> $@
+	@sed -e 's/\(#include "imconfig.h"\)/\/\/\1/' -i $@
 
 imgui_app.cpp: header.txt $(CPP) src/imgui_app.cpp 
 	@cat header.txt > $@

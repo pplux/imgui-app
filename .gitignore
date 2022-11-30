@@ -1,6 +1,7 @@
 # Generated
 header.txt
 *.tgz
+*.zip
 
 # Prerequisites
 *.d
