@@ -22,6 +22,13 @@ if (APPLE)
         "-framework Cocoa"
         "-framework MetalKit"
         "-framework Metal")
+elseif (CMAKE_SYSTEM_NAME STREQUAL Linux)
+  target_link_libraries(test PRIVATE X11 Xi Xcursor dl m GL)
+  target_compile_definitions(test PRIVATE SOKOL_GLCORE33)
+
+  target_link_libraries(test_advanced PRIVATE X11 Xi Xcursor dl m GL)
+  target_compile_definitions(test_advanced PRIVATE SOKOL_GLCORE33)
 else()
   add_compile_definitions(SOKOL_GLCORE33)
 endif()
+
