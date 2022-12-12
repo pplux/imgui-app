@@ -44,7 +44,7 @@ static void cleanup(void) {
     sg_shutdown();
 }
 
-static void event(const sapp_event* ev) {
+void event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 

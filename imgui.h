@@ -24,6 +24,9 @@ void imgui_app(
     int ImGuiConfigFlags = 0
     );
 
+// Called by imgui-app unless you override the event callback
+void event(const sapp_event* ev);
+
 
 typedef void* ImTextureID;
 ImTextureID imgui_app_loadImageRGBA8(const void *data, int width, int height);
