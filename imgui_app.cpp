@@ -4,7 +4,7 @@
 // imgui:
 //    a8df192df022ed6ac447e7b7ada718c4c4824b41(Thu Nov 24 21:24:33 2022 +0100)
 // sokol:
-//    7cf434a922fe1bab285db96bf792f647b83314f7(Sun Nov 27 14:54:32 2022 +0100)
+//    173da5b453a54721fa5a9b312b99de656e885c45(Sun May 15 19:07:21 2022 +0200)
 // ----------------------------------------------------------------------------
 #define SOKOL_IMPL
 #define SOKOL_NO_ENTRY
@@ -44,6 +44,7 @@
     Optionally provide the following defines with your own implementations:
 
         SOKOL_ASSERT(c)     - your own assert macro (default: assert(c))
+        SOKOL_LOG(msg)      - your own logging function (default: puts(msg))
         SOKOL_UNREACHABLE() - a guard macro for unreachable code (default: assert(false))
         SOKOL_ABORT()       - called after an unrecoverable error (default: abort())
         SOKOL_WIN32_FORCE_MAIN  - define this on Win32 to use a main() entry point instead of WinMain
@@ -65,9 +66,6 @@
     On Windows, SOKOL_DLL will define SOKOL_APP_API_DECL as __declspec(dllexport)
     or __declspec(dllimport) as needed.
 
-    On Linux, SOKOL_GLCORE33 can use either GLX or EGL.
-    GLX is default, set SOKOL_FORCE_EGL to override.
-
     For example code, see https://github.com/floooh/sokol-samples/tree/master/sapp
 
     Portions of the Windows and Linux GL initialization, event-, icon- etc... code
@@ -81,8 +79,7 @@
     - on macOS with GL: Cocoa, QuartzCore, OpenGL
     - on iOS with Metal: Foundation, UIKit, Metal, MetalKit
     - on iOS with GL: Foundation, UIKit, OpenGLES, GLKit
-    - on Linux with EGL: X11, Xi, Xcursor, EGL, GL (or GLESv2), dl, pthread, m(?)
-    - on Linux with GLX: X11, Xi, Xcursor, GL, dl, pthread, m(?)
+    - on Linux: X11, Xi, Xcursor, GL, dl, pthread, m(?)
     - on Android: GLESv3, EGL, log, android
     - on Windows with the MSVC or Clang toolchains: no action needed, libs are defined in-source via pragma-comment-lib
     - on Windows with MINGW/MSYS2 gcc: compile with '-mwin32' so that _WIN32 is defined
@@ -108,56 +105,55 @@
     - creates a window and 3D-API context/device with a 'default framebuffer'
     - makes the rendered frame visible
     - provides keyboard-, mouse- and low-level touch-events
-    - platforms: MacOS, iOS, HTML5, Win32, Linux/RaspberryPi, Android
+    - platforms: MacOS, iOS, HTML5, Win32, Linux, Android (TODO: RaspberryPi)
     - 3D-APIs: Metal, D3D11, GL3.2, GLES2, GLES3, WebGL, WebGL2
 
     FEATURE/PLATFORM MATRIX
     =======================
-                        | Windows | macOS | Linux |  iOS  | Android | UWP  | HTML5
-    --------------------+---------+-------+-------+-------+---------+------+-------
-    gl 3.x              | YES     | YES   | YES   | ---   | ---     | ---  | ---
-    gles2/webgl         | ---     | ---   | YES(2)| YES   | YES     | ---  | YES
-    gles3/webgl2        | ---     | ---   | YES(2)| YES   | YES     | ---  | YES
-    metal               | ---     | YES   | ---   | YES   | ---     | ---  | ---
-    d3d11               | YES     | ---   | ---   | ---   | ---     | YES  | ---
-    KEY_DOWN            | YES     | YES   | YES   | SOME  | TODO    | YES  | YES
-    KEY_UP              | YES     | YES   | YES   | SOME  | TODO    | YES  | YES
-    CHAR                | YES     | YES   | YES   | YES   | TODO    | YES  | YES
-    MOUSE_DOWN          | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    MOUSE_UP            | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    MOUSE_SCROLL        | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    MOUSE_MOVE          | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    MOUSE_ENTER         | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    MOUSE_LEAVE         | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    TOUCHES_BEGAN       | ---     | ---   | ---   | YES   | YES     | TODO | YES
-    TOUCHES_MOVED       | ---     | ---   | ---   | YES   | YES     | TODO | YES
-    TOUCHES_ENDED       | ---     | ---   | ---   | YES   | YES     | TODO | YES
-    TOUCHES_CANCELLED   | ---     | ---   | ---   | YES   | YES     | TODO | YES
-    RESIZED             | YES     | YES   | YES   | YES   | YES     | YES  | YES
-    ICONIFIED           | YES     | YES   | YES   | ---   | ---     | YES  | ---
-    RESTORED            | YES     | YES   | YES   | ---   | ---     | YES  | ---
-    FOCUSED             | YES     | YES   | YES   | ---   | ---     | ---  | YES
-    UNFOCUSED           | YES     | YES   | YES   | ---   | ---     | ---  | YES
-    SUSPENDED           | ---     | ---   | ---   | YES   | YES     | YES  | TODO
-    RESUMED             | ---     | ---   | ---   | YES   | YES     | YES  | TODO
-    QUIT_REQUESTED      | YES     | YES   | YES   | ---   | ---     | ---  | YES
-    IME                 | TODO    | TODO? | TODO  | ???   | TODO    | ---  | ???
-    key repeat flag     | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    windowed            | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    fullscreen          | YES     | YES   | YES   | YES   | YES     | YES  | ---
-    mouse hide          | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    mouse lock          | YES     | YES   | YES   | ---   | ---     | TODO | YES
-    set cursor type     | YES     | YES   | YES   | ---   | ---     | YES  | YES
-    screen keyboard     | ---     | ---   | ---   | YES   | TODO    | TODO | YES
-    swap interval       | YES     | YES   | YES   | YES   | TODO    | ---  | YES
-    high-dpi            | YES     | YES   | TODO  | YES   | YES     | YES  | YES
-    clipboard           | YES     | YES   | TODO  | ---   | ---     | TODO | YES
-    MSAA                | YES     | YES   | YES   | YES   | YES     | TODO | YES
-    drag'n'drop         | YES     | YES   | YES   | ---   | ---     | TODO | YES
-    window icon         | YES     | YES(1)| YES   | ---   | ---     | TODO | YES
+                        | Windows | macOS | Linux |  iOS  | Android | UWP  | Raspi | HTML5
+    --------------------+---------+-------+-------+-------+---------+------+-------+-------
+    gl 3.x              | YES     | YES   | YES   | ---   | ---     | ---  | ---   | ---
+    gles2/webgl         | ---     | ---   | ---   | YES   | YES     | ---  | TODO  | YES
+    gles3/webgl2        | ---     | ---   | ---   | YES   | YES     | ---  | ---   | YES
+    metal               | ---     | YES   | ---   | YES   | ---     | ---  | ---   | ---
+    d3d11               | YES     | ---   | ---   | ---   | ---     | YES  | ---   | ---
+    KEY_DOWN            | YES     | YES   | YES   | SOME  | TODO    | YES  | TODO  | YES
+    KEY_UP              | YES     | YES   | YES   | SOME  | TODO    | YES  | TODO  | YES
+    CHAR                | YES     | YES   | YES   | YES   | TODO    | YES  | TODO  | YES
+    MOUSE_DOWN          | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    MOUSE_UP            | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    MOUSE_SCROLL        | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    MOUSE_MOVE          | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    MOUSE_ENTER         | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    MOUSE_LEAVE         | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    TOUCHES_BEGAN       | ---     | ---   | ---   | YES   | YES     | TODO | ---   | YES
+    TOUCHES_MOVED       | ---     | ---   | ---   | YES   | YES     | TODO | ---   | YES
+    TOUCHES_ENDED       | ---     | ---   | ---   | YES   | YES     | TODO | ---   | YES
+    TOUCHES_CANCELLED   | ---     | ---   | ---   | YES   | YES     | TODO | ---   | YES
+    RESIZED             | YES     | YES   | YES   | YES   | YES     | YES  | ---   | YES
+    ICONIFIED           | YES     | YES   | YES   | ---   | ---     | YES  | ---   | ---
+    RESTORED            | YES     | YES   | YES   | ---   | ---     | YES  | ---   | ---
+    FOCUSED             | YES     | YES   | YES   | ---   | ---     | ---  | ---   | YES
+    UNFOCUSED           | YES     | YES   | YES   | ---   | ---     | ---  | ---   | YES
+    SUSPENDED           | ---     | ---   | ---   | YES   | YES     | YES  | ---   | TODO
+    RESUMED             | ---     | ---   | ---   | YES   | YES     | YES  | ---   | TODO
+    QUIT_REQUESTED      | YES     | YES   | YES   | ---   | ---     | ---  | TODO  | YES
+    UPDATE_CURSOR       | YES     | YES   | TODO  | ---   | ---     | TODO | ---   | TODO
+    IME                 | TODO    | TODO? | TODO  | ???   | TODO    | ---  | ???   | ???
+    key repeat flag     | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    windowed            | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | YES
+    fullscreen          | YES     | YES   | YES   | YES   | YES     | YES  | TODO  | ---
+    mouse hide          | YES     | YES   | YES   | ---   | ---     | YES  | TODO  | TODO
+    mouse lock          | YES     | YES   | YES   | ---   | ---     | TODO | TODO  | YES
+    screen keyboard     | ---     | ---   | ---   | YES   | TODO    | TODO | ---   | YES
+    swap interval       | YES     | YES   | YES   | YES   | TODO    | ---  | TODO  | YES
+    high-dpi            | YES     | YES   | TODO  | YES   | YES     | YES  | TODO  | YES
+    clipboard           | YES     | YES   | TODO  | ---   | ---     | TODO | ---   | YES
+    MSAA                | YES     | YES   | YES   | YES   | YES     | TODO | TODO  | YES
+    drag'n'drop         | YES     | YES   | YES   | ---   | ---     | TODO | TODO  | YES
+    window icon         | YES     | YES(1)| YES   | ---   | ---     | TODO | TODO  | YES
 
     (1) macOS has no regular window icons, instead the dock icon is changed
-    (2) supported with EGL only (not GLX)
 
     STEP BY STEP
     ============
@@ -219,7 +215,7 @@
             The fail callback is called when a fatal error is encountered
             during start which doesn't allow the program to continue.
             Providing a callback here gives you a chance to show an error message
-            to the user. The default behaviour is SAPP_LOG(msg)
+            to the user. The default behaviour is SOKOL_LOG(msg)
 
         As you can see, those 'standard callbacks' don't have a user_data
         argument, so any data that needs to be preserved between callbacks
@@ -382,32 +378,6 @@
         behaviour, and how to intercept a pending quit - for instance to show a
         "Really Quit?" dialog box). Note that the cleanup-callback isn't
         guaranteed to be called on the web and mobile platforms.
-
-    MOUSE CURSOR TYPE AND VISIBILITY
-    ================================
-    You can show and hide the mouse cursor with
-
-        void sapp_show_mouse(bool show)
-
-    And to get the current shown status:
-
-        bool sapp_mouse_shown(void)
-
-    NOTE that hiding the mouse cursor is different and independent from
-    the MOUSE/POINTER LOCK feature which will also hide the mouse pointer when
-    active (MOUSE LOCK is described below).
-
-    To change the mouse cursor to one of several predefined types, call
-    the function:
-
-        void sapp_set_mouse_cursor(sapp_mouse_cursor cursor)
-
-    Setting the default mouse cursor SAPP_MOUSECURSOR_DEFAULT will restore
-    the standard look.
-
-    To get the currently active mouse cursor type, call:
-
-        sapp_mouse_cursor sapp_get_mouse_cursor(void)
 
     MOUSE LOCK (AKA POINTER LOCK, AKA MOUSE CAPTURE)
     ================================================
@@ -649,10 +619,8 @@
         sapp_html5_fetch_dropped_file(&(sapp_html5_fetch_request){
             .dropped_file_index = 0,
             .callback = fetch_cb
-            .buffer = {
-                .ptr = buf,
-                .size = sizeof(buf)
-            },
+            .buffer_ptr = buf,
+            .buffer_size = buf_size,
             .user_data = ...
         });
 
@@ -666,9 +634,9 @@
             // IMPORTANT: check if the loading operation actually succeeded:
             if (response->succeeded) {
                 // the size of the loaded file:
-                const size_t num_bytes = response->data.size;
+                const uint32_t num_bytes = response->fetched_size;
                 // and the pointer to the data (same as 'buf' in the fetch-call):
-                const void* ptr = response->data.ptr;
+                const void* ptr = response->buffer_ptr;
             }
             else {
                 // on error check the error code:
@@ -1046,7 +1014,7 @@
                 .allocator = {
                     .alloc = my_alloc,
                     .free = my_free,
-                    .user_data = ...,
+                    .user_data = ...;
                 }
             };
         }
@@ -1056,35 +1024,15 @@
     This only affects memory allocation calls done by sokol_app.h
     itself though, not any allocations in OS libraries.
 
-
-    LOG FUNCTION OVERRIDE
-    =====================
-    You can override the log function at initialization time like this:
-
-        void my_log(const char* message, void* user_data) {
-            printf("sapp says: \s\n", message);
-        }
-
-        sapp_desc sokol_main(int argc, char* argv[]) {
-            return (sapp_desc){
-                // ...
-                .logger = {
-                    .log_cb = my_log,
-                    .user_data = ...,
-                }
-            };
-        }
-
-    If no overrides are provided, puts will be used on most platforms.
-    On Android, __android_log_write will be used instead.
-
-
     TEMP NOTE DUMP
     ==============
     - onscreen keyboard support on Android requires Java :(, should we even bother?
     - sapp_desc needs a bool whether to initialize depth-stencil surface
     - GL context initialization needs more control (at least what GL version to initialize)
     - application icon
+    - the UPDATE_CURSOR event currently behaves differently between Win32 and OSX
+      (Win32 sends the event each frame when the mouse moves and is inside the window
+      client area, OSX sends it only once when the mouse enters the client area)
     - the Android implementation calls cleanup_cb() and destroys the egl context in onDestroy
       at the latest but should do it earlier, in onStop, as an app is "killable" after onStop
       on Android Honeycomb and later (it can't be done at the moment as the app may be started
@@ -1176,6 +1124,7 @@ typedef enum sapp_event_type {
     SAPP_EVENTTYPE_UNFOCUSED,
     SAPP_EVENTTYPE_SUSPENDED,
     SAPP_EVENTTYPE_RESUMED,
+    SAPP_EVENTTYPE_UPDATE_CURSOR,
     SAPP_EVENTTYPE_QUIT_REQUESTED,
     SAPP_EVENTTYPE_CLIPBOARD_PASTED,
     SAPP_EVENTTYPE_FILES_DROPPED,
@@ -1316,23 +1265,6 @@ typedef enum sapp_keycode {
 } sapp_keycode;
 
 /*
-    Android specific 'tool type' enum for touch events. This lets the
-    application check what type of input device was used for
-    touch events.
-
-    NOTE: the values must remain in sync with the corresponding
-    Android SDK type, so don't change those.
-
-    See https://developer.android.com/reference/android/view/MotionEvent#TOOL_TYPE_UNKNOWN
-*/
-typedef enum sapp_android_tooltype {
-    SAPP_ANDROIDTOOLTYPE_UNKNOWN = 0,   // TOOL_TYPE_UNKNOWN
-    SAPP_ANDROIDTOOLTYPE_FINGER = 1,    // TOOL_TYPE_FINGER
-    SAPP_ANDROIDTOOLTYPE_STYLUS = 2,    // TOOL_TYPE_STYLUS
-    SAPP_ANDROIDTOOLTYPE_MOUSE = 3,     // TOOL_TYPE_MOUSE
-} sapp_android_tooltype;
-
-/*
     sapp_touchpoint
 
     Describes a single touchpoint in a multitouch event (TOUCHES_BEGAN,
@@ -1345,7 +1277,6 @@ typedef struct sapp_touchpoint {
     uintptr_t identifier;
     float pos_x;
     float pos_y;
-    sapp_android_tooltype android_tooltype; // only valid on Android
     bool changed;
 } sapp_touchpoint;
 
@@ -1476,22 +1407,14 @@ typedef struct sapp_icon_desc {
     alloc and free function must be provided (e.g. it's not valid to
     override one function but not the other).
 */
+typedef void*(*sapp_malloc)(size_t size, void* user_data);
+typedef void(*sapp_free)(void* ptr, void* user_data);
+
 typedef struct sapp_allocator {
-    void* (*alloc)(size_t size, void* user_data);
-    void (*free)(void* ptr, void* user_data);
+    sapp_malloc alloc;
+    sapp_free free;
     void* user_data;
 } sapp_allocator;
-
-/*
-    sapp_logger
-
-    Used in sapp_desc to provide custom log callbacks to sokol_app.h.
-    Default behavior is SOKOL_LOG(message).
-*/
-typedef struct sapp_logger {
-    void (*log_cb)(const char* message, void* user_data);
-    void* user_data;
-} sapp_logger;
 
 typedef struct sapp_desc {
     void (*init_cb)(void);                  // these are the user-provided callbacks without user data
@@ -1515,6 +1438,7 @@ typedef struct sapp_desc {
     bool fullscreen;                    // whether the window should be created in fullscreen mode
     bool alpha;                         // whether the framebuffer should have an alpha channel (ignored on some platforms)
     const char* window_title;           // the window title as UTF-8 encoded string
+    bool user_cursor;                   // if true, user is expected to manage cursor image in SAPP_EVENTTYPE_UPDATE_CURSOR
     bool enable_clipboard;              // enable clipboard access, default is false
     int clipboard_size;                 // max size of clipboard content in bytes
     bool enable_dragndrop;              // enable file dropping (drag'n'drop), default is false
@@ -1522,12 +1446,9 @@ typedef struct sapp_desc {
     int max_dropped_file_path_length;   // max length in bytes of a dropped UTF-8 file path (default: 2048)
     sapp_icon_desc icon;                // the initial window icon to set
     sapp_allocator allocator;           // optional memory allocation overrides (default: malloc/free)
-    sapp_logger logger;                 // optional log callback overrides (default: SAPP_LOG(message))
 
     /* backend-specific options */
     bool gl_force_gles2;                // if true, setup GLES2/WebGL even if GLES3/WebGL2 is available
-    int gl_major_version;               // override GL major and minor version (the default GL version is 3.2)
-    int gl_minor_version;
     bool win32_console_utf8;            // if true, set the output console codepage to UTF-8
     bool win32_console_create;          // if true, attach stdout/stderr to a new console window
     bool win32_console_attach;          // if true, attach stdout/stderr to parent process
@@ -1549,40 +1470,22 @@ typedef enum sapp_html5_fetch_error {
 } sapp_html5_fetch_error;
 
 typedef struct sapp_html5_fetch_response {
-    bool succeeded;         // true if the loading operation has succeeded
+    bool succeeded;         /* true if the loading operation has succeeded */
     sapp_html5_fetch_error error_code;
-    int file_index;         // index of the dropped file (0..sapp_get_num_dropped_filed()-1)
-    sapp_range data;        // pointer and size of the fetched data (data.ptr == buffer.ptr, data.size <= buffer.size)
-    sapp_range buffer;      // the user-provided buffer ptr/size pair (buffer.ptr == data.ptr, buffer.size >= data.size)
-    void* user_data;        // user-provided user data pointer
+    int file_index;         /* index of the dropped file (0..sapp_get_num_dropped_filed()-1) */
+    uint32_t fetched_size;  /* size in bytes of loaded data */
+    void* buffer_ptr;       /* pointer to user-provided buffer which contains the loaded data */
+    uint32_t buffer_size;   /* size of user-provided buffer (buffer_size >= fetched_size) */
+    void* user_data;        /* user-provided user data pointer */
 } sapp_html5_fetch_response;
 
 typedef struct sapp_html5_fetch_request {
-    int dropped_file_index; // 0..sapp_get_num_dropped_files()-1
-    void (*callback)(const sapp_html5_fetch_response*);     // response callback function pointer (required)
-    sapp_range buffer;      // ptr/size of a memory buffer to load the data into
-    void* user_data;        // optional userdata pointer
+    int dropped_file_index;                 /* 0..sapp_get_num_dropped_files()-1 */
+    void (*callback)(const sapp_html5_fetch_response*);     /* response callback function pointer (required) */
+    void* buffer_ptr;                       /* pointer to buffer to load data into */
+    uint32_t buffer_size;                   /* size in bytes of buffer */
+    void* user_data;                        /* optional userdata pointer */
 } sapp_html5_fetch_request;
-
-/*
-    sapp_mouse_cursor
-
-    Predefined cursor image definitions, set with sapp_set_mouse_cursor(sapp_mouse_cursor cursor)
-*/
-typedef enum sapp_mouse_cursor {
-    SAPP_MOUSECURSOR_DEFAULT = 0,   // equivalent with system default cursor
-    SAPP_MOUSECURSOR_ARROW,
-    SAPP_MOUSECURSOR_IBEAM,
-    SAPP_MOUSECURSOR_CROSSHAIR,
-    SAPP_MOUSECURSOR_POINTING_HAND,
-    SAPP_MOUSECURSOR_RESIZE_EW,
-    SAPP_MOUSECURSOR_RESIZE_NS,
-    SAPP_MOUSECURSOR_RESIZE_NWSE,
-    SAPP_MOUSECURSOR_RESIZE_NESW,
-    SAPP_MOUSECURSOR_RESIZE_ALL,
-    SAPP_MOUSECURSOR_NOT_ALLOWED,
-    _SAPP_MOUSECURSOR_NUM,
-} sapp_mouse_cursor;
 
 /* user-provided functions */
 extern sapp_desc sokol_main(int argc, char* argv[]);
@@ -1623,10 +1526,6 @@ SOKOL_APP_API_DECL bool sapp_mouse_shown(void);
 SOKOL_APP_API_DECL void sapp_lock_mouse(bool lock);
 /* return true if in mouse-pointer-lock mode (this may toggle a few frames later) */
 SOKOL_APP_API_DECL bool sapp_mouse_locked(void);
-/* set mouse cursor type */
-SOKOL_APP_API_DECL void sapp_set_mouse_cursor(sapp_mouse_cursor cursor);
-/* get current mouse cursor type */
-SOKOL_APP_API_DECL sapp_mouse_cursor sapp_get_mouse_cursor(void);
 /* return the userdata pointer optionally provided in sapp_desc */
 SOKOL_APP_API_DECL void* sapp_userdata(void);
 /* return a copy of the sapp_desc structure */
@@ -1658,11 +1557,6 @@ SOKOL_APP_API_DECL const char* sapp_get_dropped_file_path(int index);
 
 /* special run-function for SOKOL_NO_ENTRY (in standard mode this is an empty stub) */
 SOKOL_APP_API_DECL void sapp_run(const sapp_desc* desc);
-
-/* EGL: get EGLDisplay object */
-SOKOL_APP_API_DECL const void* sapp_egl_get_display(void);
-/* EGL: get EGLContext object */
-SOKOL_APP_API_DECL const void* sapp_egl_get_context(void);
 
 /* GL: return true when GLES2 fallback is active (to detect fallback from GLES3) */
 SOKOL_APP_API_DECL bool sapp_gles2(void);
@@ -1739,7 +1633,6 @@ inline void sapp_run(const sapp_desc& desc) { return sapp_run(&desc); }
 #include <stdlib.h> // malloc, free
 #include <string.h> // memset
 #include <stddef.h> // size_t
-#include <math.h>   /* roundf() */
 
 /* check if the config defines are alright */
 #if defined(__APPLE__)
@@ -1799,12 +1692,8 @@ inline void sapp_run(const sapp_desc& desc) { return sapp_run(&desc); }
 #elif defined(__linux__) || defined(__unix__)
     /* Linux */
     #define _SAPP_LINUX (1)
-    #if defined(SOKOL_GLCORE33)
-        #if !defined(SOKOL_FORCE_EGL)
-            #define _SAPP_GLX (1)
-        #endif
-    #elif !defined(SOKOL_GLES3) && !defined(SOKOL_GLES2)
-        #error("sokol_app.h: unknown 3D API selected for Linux, must be SOKOL_GLCORE33, SOKOL_GLES3 or SOKOL_GLES2")
+    #if !defined(SOKOL_GLCORE33)
+    #error("sokol_app.h: unknown 3D API selected for Linux, must be SOKOL_GLCORE33")
     #endif
 #else
 #error "sokol_app.h: Unknown platform"
@@ -1815,7 +1704,7 @@ inline void sapp_run(const sapp_desc& desc) { return sapp_run(&desc); }
 #endif
 #ifndef SOKOL_DEBUG
     #ifndef NDEBUG
-        #define SOKOL_DEBUG
+        #define SOKOL_DEBUG (1)
     #endif
 #endif
 #ifndef SOKOL_ASSERT
@@ -1825,22 +1714,19 @@ inline void sapp_run(const sapp_desc& desc) { return sapp_run(&desc); }
 #ifndef SOKOL_UNREACHABLE
     #define SOKOL_UNREACHABLE SOKOL_ASSERT(false)
 #endif
-
-#if !defined(SOKOL_DEBUG)
-    #define SAPP_LOG(s)
-#else
-    #define SAPP_LOG(s) _sapp_log(s)
-    #ifndef SOKOL_LOG
+#ifndef SOKOL_LOG
+    #ifdef SOKOL_DEBUG
         #if defined(__ANDROID__)
             #include <android/log.h>
-            #define SOKOL_LOG(s) __android_log_write(ANDROID_LOG_INFO, "SOKOL_APP", s)
+            #define SOKOL_LOG(s) { SOKOL_ASSERT(s); __android_log_write(ANDROID_LOG_INFO, "SOKOL_APP", s); }
         #else
             #include <stdio.h>
-            #define SOKOL_LOG(s) puts(s)
+            #define SOKOL_LOG(s) { SOKOL_ASSERT(s); puts(s); }
         #endif
+    #else
+        #define SOKOL_LOG(s)
     #endif
 #endif
-
 #ifndef SOKOL_ABORT
     #define SOKOL_ABORT() abort()
 #endif
@@ -1982,11 +1868,7 @@ inline void sapp_run(const sapp_desc& desc) { return sapp_run(&desc); }
     #include <X11/Xatom.h>
     #include <X11/extensions/XInput2.h>
     #include <X11/Xcursor/Xcursor.h>
-    #include <X11/cursorfont.h> /* XC_* font cursors */
     #include <X11/Xmd.h> /* CARD32 */
-    #if !defined(_SAPP_GLX)
-        #include <EGL/egl.h>
-    #endif
     #include <dlfcn.h> /* dlopen, dlsym, dlclose */
     #include <limits.h> /* LONG_MAX */
     #include <pthread.h>    /* only used a linker-guard, search for _sapp_linux_run() and see first comment */
@@ -2229,7 +2111,6 @@ typedef struct {
     _sapp_macos_app_delegate* app_dlg;
     _sapp_macos_window_delegate* win_dlg;
     _sapp_macos_view* view;
-    NSCursor* cursors[_SAPP_MOUSECURSOR_NUM];
     #if defined(SOKOL_METAL)
         id<MTLDevice> mtl_device;
     #endif
@@ -2351,7 +2232,6 @@ typedef struct {
     HDC dc;
     HICON big_icon;
     HICON small_icon;
-    HCURSOR cursors[_SAPP_MOUSECURSOR_NUM];
     UINT orig_codepage;
     LONG mouse_locked_x, mouse_locked_y;
     RECT stored_window_rect;    // used to restore window pos/size when toggling fullscreen => windowed
@@ -2574,7 +2454,6 @@ typedef struct {
     Colormap colormap;
     Window window;
     Cursor hidden_cursor;
-    Cursor cursors[_SAPP_MOUSECURSOR_NUM];
     int window_state;
     float dpi;
     unsigned char error_code;
@@ -2590,8 +2469,6 @@ typedef struct {
     _sapp_xi_t xi;
     _sapp_xdnd_t xdnd;
 } _sapp_x11_t;
-
-#if defined(_SAPP_GLX)
 
 typedef struct {
     void* libgl;
@@ -2631,16 +2508,6 @@ typedef struct {
     bool ARB_create_context_profile;
 } _sapp_glx_t;
 
-#else
-
-typedef struct {
-    EGLDisplay display;
-    EGLContext context;
-    EGLSurface surface;
-} _sapp_egl_t;
-
-#endif // _SAPP_GLX
-
 #endif // _SAPP_LINUX
 
 /*== COMMON DECLARATIONS =====================================================*/
@@ -2661,7 +2528,7 @@ typedef struct {
 #if defined(_SAPP_MACOS) || defined(_SAPP_IOS)
     // this is ARC compatible
     #if defined(__cplusplus)
-        #define _SAPP_CLEAR_ARC_STRUCT(type, item) { item = type(); }
+        #define _SAPP_CLEAR_ARC_STRUCT(type, item) { item = { }; }
     #else
         #define _SAPP_CLEAR_ARC_STRUCT(type, item) { item = (type) { 0 }; }
     #endif
@@ -2690,7 +2557,6 @@ typedef struct {
     bool shown;
     bool locked;
     bool pos_valid;
-    sapp_mouse_cursor current_cursor;
 } _sapp_mouse_t;
 
 typedef struct {
@@ -2743,11 +2609,7 @@ typedef struct {
         _sapp_android_t android;
     #elif defined(_SAPP_LINUX)
         _sapp_x11_t x11;
-        #if defined(_SAPP_GLX)
-            _sapp_glx_t glx;
-        #else
-            _sapp_egl_t egl;
-        #endif
+        _sapp_glx_t glx;
     #endif
     char html5_canvas_selector[_SAPP_MAX_TITLE_LENGTH];
     char window_title[_SAPP_MAX_TITLE_LENGTH];      /* UTF-8 */
@@ -2790,18 +2652,6 @@ _SOKOL_PRIVATE void _sapp_free(void* ptr) {
     }
 }
 
-#if defined(SOKOL_DEBUG)
-_SOKOL_PRIVATE void _sapp_log(const char* msg) {
-    SOKOL_ASSERT(msg);
-    if (_sapp.desc.logger.log_cb) {
-        _sapp.desc.logger.log_cb(msg, _sapp.desc.logger.user_data);
-    }
-    else {
-        SOKOL_LOG(msg);
-    }
-}
-#endif
-
 _SOKOL_PRIVATE void _sapp_fail(const char* msg) {
     if (_sapp.desc.fail_cb) {
         _sapp.desc.fail_cb(msg);
@@ -2810,7 +2660,7 @@ _SOKOL_PRIVATE void _sapp_fail(const char* msg) {
         _sapp.desc.fail_userdata_cb(msg, _sapp.desc.user_data);
     }
     else {
-        SAPP_LOG(msg);
+        SOKOL_LOG(msg);
     }
     SOKOL_ABORT();
 }
@@ -2909,14 +2759,6 @@ _SOKOL_PRIVATE sapp_desc _sapp_desc_defaults(const sapp_desc* desc) {
     sapp_desc res = *desc;
     res.sample_count = _sapp_def(res.sample_count, 1);
     res.swap_interval = _sapp_def(res.swap_interval, 1);
-    // NOTE: can't patch the default for gl_major_version and gl_minor_version
-    // independently, because a desired version 4.0 would be patched to 4.2
-    // (or expressed differently: zero is a valid value for gl_minor_version
-    // and can't be used to indicate 'default')
-    if (0 == res.gl_major_version) {
-        res.gl_major_version = 3;
-        res.gl_minor_version = 2;
-    }
     res.html5_canvas_name = _sapp_def(res.html5_canvas_name, "canvas");
     res.clipboard_size = _sapp_def(res.clipboard_size, 8192);
     res.max_dropped_files = _sapp_def(res.max_dropped_files, 1);
@@ -3035,7 +2877,7 @@ _SOKOL_PRIVATE bool _sapp_image_validate(const sapp_image_desc* desc) {
     SOKOL_ASSERT(desc->pixels.size > 0);
     const size_t wh_size = (size_t)(desc->width * desc->height) * sizeof(uint32_t);
     if (wh_size != desc->pixels.size) {
-        SAPP_LOG("Image data size mismatch (must be width*height*4 bytes)\n");
+        SOKOL_LOG("Image data size mismatch (must be width*height*4 bytes)\n");
         return false;
     }
     return true;
@@ -3329,28 +3171,6 @@ _SOKOL_PRIVATE void _sapp_macos_discard_state(void) {
     _SAPP_OBJC_RELEASE(_sapp.macos.window);
 }
 
-// undocumented methods for creating cursors (see GLFW 3.4 and imgui_impl_osx.mm)
-@interface NSCursor()
-+ (id)_windowResizeNorthWestSouthEastCursor;
-+ (id)_windowResizeNorthEastSouthWestCursor;
-+ (id)_windowResizeNorthSouthCursor;
-+ (id)_windowResizeEastWestCursor;
-@end
-
-_SOKOL_PRIVATE void _sapp_macos_init_cursors(void) {
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_DEFAULT] = nil; // not a bug
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_ARROW] = [NSCursor arrowCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_IBEAM] = [NSCursor IBeamCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_CROSSHAIR] = [NSCursor crosshairCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_POINTING_HAND] = [NSCursor pointingHandCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_RESIZE_EW] = [NSCursor respondsToSelector:@selector(_windowResizeEastWestCursor)] ? [NSCursor _windowResizeEastWestCursor] : [NSCursor resizeLeftRightCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_RESIZE_NS] = [NSCursor respondsToSelector:@selector(_windowResizeNorthSouthCursor)] ? [NSCursor _windowResizeNorthSouthCursor] : [NSCursor resizeUpDownCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_RESIZE_NWSE] = [NSCursor respondsToSelector:@selector(_windowResizeNorthWestSouthEastCursor)] ? [NSCursor _windowResizeNorthWestSouthEastCursor] : [NSCursor closedHandCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_RESIZE_NESW] = [NSCursor respondsToSelector:@selector(_windowResizeNorthEastSouthWestCursor)] ? [NSCursor _windowResizeNorthEastSouthWestCursor] : [NSCursor closedHandCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_RESIZE_ALL] = [NSCursor closedHandCursor];
-    _sapp.macos.cursors[SAPP_MOUSECURSOR_NOT_ALLOWED] = [NSCursor operationNotAllowedCursor];
-}
-
 _SOKOL_PRIVATE void _sapp_macos_run(const sapp_desc* desc) {
     _sapp_init_state(desc);
     _sapp_macos_init_keytable();
@@ -3440,19 +3260,19 @@ _SOKOL_PRIVATE void _sapp_macos_update_dimensions(void) {
         _sapp.dpi_scale = 1.0f;
     }
     const NSRect bounds = [_sapp.macos.view bounds];
-    _sapp.window_width = (int)roundf(bounds.size.width);
-    _sapp.window_height = (int)roundf(bounds.size.height);
+    _sapp.window_width = bounds.size.width;
+    _sapp.window_height = bounds.size.height;
     #if defined(SOKOL_METAL)
-        _sapp.framebuffer_width = (int)roundf(bounds.size.width * _sapp.dpi_scale);
-        _sapp.framebuffer_height = (int)roundf(bounds.size.height * _sapp.dpi_scale);
+        _sapp.framebuffer_width = bounds.size.width * _sapp.dpi_scale;
+        _sapp.framebuffer_height = bounds.size.height * _sapp.dpi_scale;
         const CGSize fb_size = _sapp.macos.view.drawableSize;
-        const int cur_fb_width = (int)roundf(fb_size.width);
-        const int cur_fb_height = (int)roundf(fb_size.height);
+        const int cur_fb_width = (int) fb_size.width;
+        const int cur_fb_height = (int) fb_size.height;
         const bool dim_changed = (_sapp.framebuffer_width != cur_fb_width) ||
                                  (_sapp.framebuffer_height != cur_fb_height);
     #elif defined(SOKOL_GLCORE33)
-        const int cur_fb_width = (int)roundf(bounds.size.width * _sapp.dpi_scale);
-        const int cur_fb_height = (int)roundf(bounds.size.height * _sapp.dpi_scale);
+        const int cur_fb_width = (int) bounds.size.width * _sapp.dpi_scale;
+        const int cur_fb_height = (int) bounds.size.height * _sapp.dpi_scale;
         const bool dim_changed = (_sapp.framebuffer_width != cur_fb_width) ||
                                  (_sapp.framebuffer_height != cur_fb_height);
         _sapp.framebuffer_width = cur_fb_width;
@@ -3566,31 +3386,11 @@ _SOKOL_PRIVATE void _sapp_macos_lock_mouse(bool lock) {
     */
     if (_sapp.mouse.locked) {
         CGAssociateMouseAndMouseCursorPosition(NO);
-        [NSCursor hide];
+        CGDisplayHideCursor(kCGDirectMainDisplay);
     }
     else {
-        [NSCursor unhide];
+        CGDisplayShowCursor(kCGDirectMainDisplay);
         CGAssociateMouseAndMouseCursorPosition(YES);
-    }
-}
-
-_SOKOL_PRIVATE void _sapp_macos_update_cursor(sapp_mouse_cursor cursor, bool shown) {
-    // show/hide cursor only if visibility status has changed (required because show/hide stacks)
-    if (shown != _sapp.mouse.shown) {
-        if (shown) {
-            [NSCursor unhide];
-        }
-        else {
-            [NSCursor hide];
-        }
-    }
-    // update cursor type
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    if (_sapp.macos.cursors[cursor]) {
-        [_sapp.macos.cursors[cursor] set];
-    }
-    else {
-        [[NSCursor arrowCursor] set];
     }
 }
 
@@ -3637,15 +3437,14 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
 @implementation _sapp_macos_app_delegate
 - (void)applicationDidFinishLaunching:(NSNotification*)aNotification {
     _SOKOL_UNUSED(aNotification);
-    _sapp_macos_init_cursors();
     if ((_sapp.window_width == 0) || (_sapp.window_height == 0)) {
         // use 4/5 of screen size as default size
         NSRect screen_rect = NSScreen.mainScreen.frame;
         if (_sapp.window_width == 0) {
-            _sapp.window_width = (int)roundf((screen_rect.size.width * 4.0f) / 5.0f);
+            _sapp.window_width = (screen_rect.size.width * 4.0f) / 5.0f;
         }
         if (_sapp.window_height == 0) {
-            _sapp.window_height = (int)roundf((screen_rect.size.height * 4.0f) / 5.0f);
+            _sapp.window_height = (screen_rect.size.height * 4.0f) / 5.0f;
         }
     }
     const NSUInteger style =
@@ -3670,7 +3469,7 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
         NSInteger max_fps = 60;
         #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 120000)
         if (@available(macOS 12.0, *)) {
-            max_fps = [NSScreen.mainScreen maximumFramesPerSecond];
+            max_fps = NSScreen.mainScreen.maximumFramesPerSecond;
         }
         #endif
         _sapp.macos.mtl_device = MTLCreateSystemDefaultDevice();
@@ -3690,15 +3489,7 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
         int i = 0;
         attrs[i++] = NSOpenGLPFAAccelerated;
         attrs[i++] = NSOpenGLPFADoubleBuffer;
-        attrs[i++] = NSOpenGLPFAOpenGLProfile;
-        const int glVersion = _sapp.desc.gl_major_version * 10 + _sapp.desc.gl_minor_version;
-        switch(glVersion) {
-            case 10: attrs[i++] = NSOpenGLProfileVersionLegacy;  break;
-            case 32: attrs[i++] = NSOpenGLProfileVersion3_2Core; break;
-            case 41: attrs[i++] = NSOpenGLProfileVersion4_1Core; break;
-            default:
-                _sapp_fail("Invalid NSOpenGLProfile (valid choices are 1.0, 3.2, and 4.1)\n");
-        }
+        attrs[i++] = NSOpenGLPFAOpenGLProfile; attrs[i++] = NSOpenGLProfileVersion3_2Core;
         attrs[i++] = NSOpenGLPFAColorSize; attrs[i++] = 24;
         attrs[i++] = NSOpenGLPFAAlphaSize; attrs[i++] = 8;
         attrs[i++] = NSOpenGLPFADepthSize; attrs[i++] = 24;
@@ -3860,7 +3651,7 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
         for (int i = 0; i < _sapp.drop.num_files; i++) {
             NSURL *fileUrl = [NSURL fileURLWithPath:[pboard.pasteboardItems[(NSUInteger)i] stringForType:NSPasteboardTypeFileURL]];
             if (!_sapp_strcpy(fileUrl.standardizedURL.path.UTF8String, _sapp_dropped_file_path_ptr(i), _sapp.drop.max_path_length)) {
-                SAPP_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)\n");
+                SOKOL_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)\n");
                 drop_failed = true;
                 break;
             }
@@ -4160,6 +3951,12 @@ _SOKOL_PRIVATE void _sapp_macos_poll_input_events() {
             _sapp_macos_mods(event));
     }
 }
+- (void)cursorUpdate:(NSEvent*)event {
+    _SOKOL_UNUSED(event);
+    if (_sapp.desc.user_cursor) {
+        _sapp_macos_app_event(SAPP_EVENTTYPE_UPDATE_CURSOR);
+    }
+}
 @end
 
 #endif /* MacOS */
@@ -4228,23 +4025,28 @@ _SOKOL_PRIVATE void _sapp_ios_touch_event(sapp_event_type type, NSSet<UITouch *>
 
 _SOKOL_PRIVATE void _sapp_ios_update_dimensions(void) {
     CGRect screen_rect = UIScreen.mainScreen.bounds;
-    _sapp.framebuffer_width = (int)roundf(screen_rect.size.width * _sapp.dpi_scale);
-    _sapp.framebuffer_height = (int)roundf(screen_rect.size.height * _sapp.dpi_scale);
-    _sapp.window_width = (int)roundf(screen_rect.size.width);
-    _sapp.window_height = (int)roundf(screen_rect.size.height);
+    _sapp.framebuffer_width = (int)(screen_rect.size.width * _sapp.dpi_scale);
+    _sapp.framebuffer_height = (int)(screen_rect.size.height * _sapp.dpi_scale);
+    _sapp.window_width = (int)screen_rect.size.width;
+    _sapp.window_height = (int)screen_rect.size.height;
     int cur_fb_width, cur_fb_height;
     #if defined(SOKOL_METAL)
         const CGSize fb_size = _sapp.ios.view.drawableSize;
-        cur_fb_width = (int)roundf(fb_size.width);
-        cur_fb_height = (int)roundf(fb_size.height);
+        cur_fb_width = (int) fb_size.width;
+        cur_fb_height = (int) fb_size.height;
     #else
-        cur_fb_width = (int)roundf(_sapp.ios.view.drawableWidth);
-        cur_fb_height = (int)roundf(_sapp.ios.view.drawableHeight);
+        cur_fb_width = (int) _sapp.ios.view.drawableWidth;
+        cur_fb_height = (int) _sapp.ios.view.drawableHeight;
     #endif
     const bool dim_changed = (_sapp.framebuffer_width != cur_fb_width) ||
                              (_sapp.framebuffer_height != cur_fb_height);
     if (dim_changed) {
         #if defined(SOKOL_METAL)
+            // NOTE: explicitely resize the drawable here again, despite MTKView using
+            // autoResizeDrawable, this seems to be the only way so that the MTKView's
+            // contentScaleFactor is honored, but also the correct screen size being
+            // reported when device rotations happen
+            // (see: https://github.com/floooh/sokol-samples/issues/101)
             const CGSize drawable_size = { (CGFloat) _sapp.framebuffer_width, (CGFloat) _sapp.framebuffer_height };
             _sapp.ios.view.drawableSize = drawable_size;
         #else
@@ -4299,16 +4101,16 @@ _SOKOL_PRIVATE void _sapp_ios_show_keyboard(bool shown) {
 - (BOOL)application:(UIApplication*)application didFinishLaunchingWithOptions:(NSDictionary*)launchOptions {
     CGRect screen_rect = UIScreen.mainScreen.bounds;
     _sapp.ios.window = [[UIWindow alloc] initWithFrame:screen_rect];
-    _sapp.window_width = (int)roundf(screen_rect.size.width);
-    _sapp.window_height = (int)roundf(screen_rect.size.height);
+    _sapp.window_width = screen_rect.size.width;
+    _sapp.window_height = screen_rect.size.height;
     if (_sapp.desc.high_dpi) {
         _sapp.dpi_scale = (float) UIScreen.mainScreen.nativeScale;
     }
     else {
         _sapp.dpi_scale = 1.0f;
     }
-    _sapp.framebuffer_width = (int)roundf(_sapp.window_width * _sapp.dpi_scale);
-    _sapp.framebuffer_height = (int)roundf(_sapp.window_height * _sapp.dpi_scale);
+    _sapp.framebuffer_width = _sapp.window_width * _sapp.dpi_scale;
+    _sapp.framebuffer_height = _sapp.window_height * _sapp.dpi_scale;
     NSInteger max_fps = UIScreen.mainScreen.maximumFramesPerSecond;
     #if defined(SOKOL_METAL)
         _sapp.ios.mtl_device = MTLCreateSystemDefaultDevice();
@@ -4318,11 +4120,6 @@ _SOKOL_PRIVATE void _sapp_ios_show_keyboard(bool shown) {
         _sapp.ios.view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
         _sapp.ios.view.depthStencilPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
         _sapp.ios.view.sampleCount = (NSUInteger)_sapp.sample_count;
-        /* NOTE: iOS MTKView seems to ignore thew view's contentScaleFactor
-            and automatically renders at Retina resolution. We'll disable
-            autoResize and instead do the resizing in _sapp_ios_update_dimensions()
-        */
-        _sapp.ios.view.autoResizeDrawable = false;
         _sapp.ios.view.userInteractionEnabled = YES;
         _sapp.ios.view.multipleTouchEnabled = YES;
         _sapp.ios.view_ctrl = [[UIViewController alloc] init];
@@ -4500,10 +4297,6 @@ _SOKOL_PRIVATE void _sapp_ios_show_keyboard(bool shown) {
 /*== EMSCRIPTEN ==============================================================*/
 #if defined(_SAPP_EMSCRIPTEN)
 
-#if defined(EM_JS_DEPS)
-EM_JS_DEPS(sokol_app, "$withStackSave,$allocateUTF8OnStack");
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -4559,7 +4352,7 @@ EMSCRIPTEN_KEEPALIVE void _sapp_emsc_drop(int i, const char* name) {
         return;
     }
     if (!_sapp_strcpy(name, _sapp_dropped_file_path_ptr(i), _sapp.drop.max_path_length)) {
-        SAPP_LOG("sokol_app.h: dropped file path too long!\n");
+        SOKOL_LOG("sokol_app.h: dropped file path too long!\n");
         _sapp.drop.num_files = 0;
     }
 }
@@ -4590,10 +4383,9 @@ EMSCRIPTEN_KEEPALIVE void _sapp_emsc_invoke_fetch_cb(int index, int success, int
     response.succeeded = (0 != success);
     response.error_code = (sapp_html5_fetch_error) error_code;
     response.file_index = index;
-    response.data.ptr = buf_ptr;
-    response.data.size = fetched_size;
-    response.buffer.ptr = buf_ptr;
-    response.buffer.size = buf_size;
+    response.fetched_size = fetched_size;
+    response.buffer_ptr = buf_ptr;
+    response.buffer_size = buf_size;
     response.user_data = user_data;
     callback(&response);
 }
@@ -4604,7 +4396,7 @@ EMSCRIPTEN_KEEPALIVE void _sapp_emsc_invoke_fetch_cb(int index, int success, int
 
 /* Javascript helper functions for mobile virtual keyboard input */
 EM_JS(void, sapp_js_create_textfield, (void), {
-    const _sapp_inp = document.createElement("input");
+    var _sapp_inp = document.createElement("input");
     _sapp_inp.type = "text";
     _sapp_inp.id = "_sokol_app_input_element";
     _sapp_inp.autocapitalize = "none";
@@ -4624,7 +4416,7 @@ EM_JS(void, sapp_js_unfocus_textfield, (void), {
 });
 
 EM_JS(void, sapp_js_add_beforeunload_listener, (void), {
-    Module.sokol_beforeunload = (event) => {
+    Module.sokol_beforeunload = function(event) {
         if (__sapp_html5_get_ask_leave_site() != 0) {
             event.preventDefault();
             event.returnValue = ' ';
@@ -4638,12 +4430,9 @@ EM_JS(void, sapp_js_remove_beforeunload_listener, (void), {
 });
 
 EM_JS(void, sapp_js_add_clipboard_listener, (void), {
-    Module.sokol_paste = (event) => {
-        const pasted_str = event.clipboardData.getData('text');
-        withStackSave(() => {
-            const cstr = allocateUTF8OnStack(pasted_str);
-            __sapp_emsc_onpaste(cstr);
-        });
+    Module.sokol_paste = function(event) {
+        var pasted_str = event.clipboardData.getData('text');
+        ccall('_sapp_emsc_onpaste', 'void', ['string'], [pasted_str]);
     };
     window.addEventListener('paste', Module.sokol_paste);
 });
@@ -4653,8 +4442,8 @@ EM_JS(void, sapp_js_remove_clipboard_listener, (void), {
 });
 
 EM_JS(void, sapp_js_write_clipboard, (const char* c_str), {
-    const str = UTF8ToString(c_str);
-    const ta = document.createElement('textarea');
+    var str = UTF8ToString(c_str);
+    var ta = document.createElement('textarea');
     ta.setAttribute('autocomplete', 'off');
     ta.setAttribute('autocorrect', 'off');
     ta.setAttribute('autocapitalize', 'off');
@@ -4676,31 +4465,29 @@ _SOKOL_PRIVATE void _sapp_emsc_set_clipboard_string(const char* str) {
 
 EM_JS(void, sapp_js_add_dragndrop_listeners, (const char* canvas_name_cstr), {
     Module.sokol_drop_files = [];
-    const canvas_name = UTF8ToString(canvas_name_cstr);
-    const canvas = document.getElementById(canvas_name);
-    Module.sokol_dragenter = (event) => {
+    var canvas_name = UTF8ToString(canvas_name_cstr);
+    var canvas = document.getElementById(canvas_name);
+    Module.sokol_dragenter = function(event) {
         event.stopPropagation();
         event.preventDefault();
     };
-    Module.sokol_dragleave = (event) => {
+    Module.sokol_dragleave = function(event) {
         event.stopPropagation();
         event.preventDefault();
     };
-    Module.sokol_dragover = (event) => {
+    Module.sokol_dragover = function(event) {
         event.stopPropagation();
         event.preventDefault();
     };
-    Module.sokol_drop = (event) => {
+    Module.sokol_drop = function(event) {
         event.stopPropagation();
         event.preventDefault();
-        const files = event.dataTransfer.files;
+        var files = event.dataTransfer.files;
         Module.sokol_dropped_files = files;
         __sapp_emsc_begin_drop(files.length);
-        for (let i = 0; i < files.length; i++) {
-            withStackSave(() => {
-                const cstr = allocateUTF8OnStack(files[i].name);
-                __sapp_emsc_drop(i, cstr);
-            });
+        var i;
+        for (i = 0; i < files.length; i++) {
+            ccall('_sapp_emsc_drop', 'void', ['number', 'string'], [i, files[i].name]);
         }
         // FIXME? see computation of targetX/targetY in emscripten via getClientBoundingRect
         __sapp_emsc_end_drop(event.clientX, event.clientY);
@@ -4712,20 +4499,18 @@ EM_JS(void, sapp_js_add_dragndrop_listeners, (const char* canvas_name_cstr), {
 });
 
 EM_JS(uint32_t, sapp_js_dropped_file_size, (int index), {
-    \x2F\x2A\x2A @suppress {missingProperties} \x2A\x2F
-    const files = Module.sokol_dropped_files;
-    if ((index < 0) || (index >= files.length)) {
+    if ((index < 0) || (index >= Module.sokol_dropped_files.length)) {
         return 0;
     }
     else {
-        return files[index].size;
+        return Module.sokol_dropped_files[index].size;
     }
 });
 
 EM_JS(void, sapp_js_fetch_dropped_file, (int index, _sapp_html5_fetch_callback callback, void* buf_ptr, uint32_t buf_size, void* user_data), {
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-        const content = loadEvent.target.result;
+    var reader = new FileReader();
+    reader.onload = function(loadEvent) {
+        var content = loadEvent.target.result;
         if (content.byteLength > buf_size) {
             // SAPP_HTML5_FETCH_ERROR_BUFFER_TOO_SMALL
             __sapp_emsc_invoke_fetch_cb(index, 0, 1, callback, 0, buf_ptr, buf_size, user_data);
@@ -4735,18 +4520,16 @@ EM_JS(void, sapp_js_fetch_dropped_file, (int index, _sapp_html5_fetch_callback c
             __sapp_emsc_invoke_fetch_cb(index, 1, 0, callback, content.byteLength, buf_ptr, buf_size, user_data);
         }
     };
-    reader.onerror = () => {
+    reader.onerror = function() {
         // SAPP_HTML5_FETCH_ERROR_OTHER
         __sapp_emsc_invoke_fetch_cb(index, 0, 2, callback, 0, buf_ptr, buf_size, user_data);
     };
-    \x2F\x2A\x2A @suppress {missingProperties} \x2A\x2F
-    const files = Module.sokol_dropped_files;
-    reader.readAsArrayBuffer(files[index]);
+    reader.readAsArrayBuffer(Module.sokol_dropped_files[index]);
 });
 
 EM_JS(void, sapp_js_remove_dragndrop_listeners, (const char* canvas_name_cstr), {
-    const canvas_name = UTF8ToString(canvas_name_cstr);
-    const canvas = document.getElementById(canvas_name);
+    var canvas_name = UTF8ToString(canvas_name_cstr);
+    var canvas = document.getElementById(canvas_name);
     canvas.removeEventListener('dragenter', Module.sokol_dragenter);
     canvas.removeEventListener('dragleave', Module.sokol_dragleave);
     canvas.removeEventListener('dragover',  Module.sokol_dragover);
@@ -4792,9 +4575,9 @@ _SOKOL_PRIVATE void _sapp_emsc_show_keyboard(bool show) {
     }
 }
 
-EM_JS(void, sapp_js_init, (const char* c_str_target), {
+EM_JS(void, sapp_js_pointer_init, (const char* c_str_target), {
     // lookup and store canvas object by name
-    const target_str = UTF8ToString(c_str_target);
+    var target_str = UTF8ToString(c_str_target);
     Module.sapp_emsc_target = document.getElementById(target_str);
     if (!Module.sapp_emsc_target) {
         console.log("sokol_app.h: invalid target:" + target_str);
@@ -4856,53 +4639,23 @@ _SOKOL_PRIVATE void _sapp_emsc_update_mouse_lock_state(void) {
     }
 }
 
-// set mouse cursor type
-EM_JS(void, sapp_js_set_cursor, (int cursor_type, int shown), {
-    if (Module.sapp_emsc_target) {
-        let cursor;
-        if (shown === 0) {
-            cursor = "none";
-        }
-        else switch (cursor_type) {
-            case 0: cursor = "auto"; break;         // SAPP_MOUSECURSOR_DEFAULT
-            case 1: cursor = "default"; break;      // SAPP_MOUSECURSOR_ARROW
-            case 2: cursor = "text"; break;         // SAPP_MOUSECURSOR_IBEAM
-            case 3: cursor = "crosshair"; break;    // SAPP_MOUSECURSOR_CROSSHAIR
-            case 4: cursor = "pointer"; break;      // SAPP_MOUSECURSOR_POINTING_HAND
-            case 5: cursor = "ew-resize"; break;    // SAPP_MOUSECURSOR_RESIZE_EW
-            case 6: cursor = "ns-resize"; break;    // SAPP_MOUSECURSOR_RESIZE_NS
-            case 7: cursor = "nwse-resize"; break;  // SAPP_MOUSECURSOR_RESIZE_NWSE
-            case 8: cursor = "nesw-resize"; break;  // SAPP_MOUSECURSOR_RESIZE_NESW
-            case 9: cursor = "all-scroll"; break;   // SAPP_MOUSECURSOR_RESIZE_ALL
-            case 10: cursor = "not-allowed"; break; // SAPP_MOUSECURSOR_NOT_ALLOWED
-            default: cursor = "auto"; break;
-        }
-        Module.sapp_emsc_target.style.cursor = cursor;
-    }
-});
-
-_SOKOL_PRIVATE void _sapp_emsc_update_cursor(sapp_mouse_cursor cursor, bool shown) {
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    sapp_js_set_cursor((int)cursor, shown ? 1 : 0);
-}
-
 /* JS helper functions to update browser tab favicon */
 EM_JS(void, sapp_js_clear_favicon, (void), {
-    const link = document.getElementById('sokol-app-favicon');
+    var link = document.getElementById('sokol-app-favicon');
     if (link) {
         document.head.removeChild(link);
     }
 });
 
 EM_JS(void, sapp_js_set_favicon, (int w, int h, const uint8_t* pixels), {
-    const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    const img_data = ctx.createImageData(w, h);
+    var ctx = canvas.getContext('2d');
+    var img_data = ctx.createImageData(w, h);
     img_data.data.set(HEAPU8.subarray(pixels, pixels + w*h*4));
     ctx.putImageData(img_data, 0, 0);
-    const new_link = document.createElement('link');
+    var new_link = document.createElement('link');
     new_link.id = 'sokol-app-favicon';
     new_link.rel = 'shortcut icon';
     new_link.href = canvas.toDataURL();
@@ -4990,19 +4743,19 @@ _SOKOL_PRIVATE EM_BOOL _sapp_emsc_size_changed(int event_type, const EmscriptenU
         w = ui_event->windowInnerWidth;
     }
     else {
-        _sapp.window_width = (int)roundf(w);
+        _sapp.window_width = (int) w;
     }
     if (h < 1.0) {
         h = ui_event->windowInnerHeight;
     }
     else {
-        _sapp.window_height = (int)roundf(h);
+        _sapp.window_height = (int) h;
     }
     if (_sapp.desc.high_dpi) {
         _sapp.dpi_scale = emscripten_get_device_pixel_ratio();
     }
-    _sapp.framebuffer_width = (int)roundf(w * _sapp.dpi_scale);
-    _sapp.framebuffer_height = (int)roundf(h * _sapp.dpi_scale);
+    _sapp.framebuffer_width = (int) (w * _sapp.dpi_scale);
+    _sapp.framebuffer_height = (int) (h * _sapp.dpi_scale);
     SOKOL_ASSERT((_sapp.framebuffer_width > 0) && (_sapp.framebuffer_height > 0));
     emscripten_set_canvas_element_size(_sapp.html5_canvas_selector, _sapp.framebuffer_width, _sapp.framebuffer_height);
     #if defined(SOKOL_WGPU)
@@ -5497,17 +5250,17 @@ EMSCRIPTEN_KEEPALIVE void _sapp_emsc_wgpu_ready(int device_id, int swapchain_id,
 EM_JS(void, sapp_js_wgpu_init, (), {
     WebGPU.initManagers();
     // FIXME: the extension activation must be more clever here
-    navigator.gpu.requestAdapter().then((adapter) => {
+    navigator.gpu.requestAdapter().then(function(adapter) {
         console.log("wgpu adapter extensions: " + adapter.extensions);
-        adapter.requestDevice({ extensions: ["textureCompressionBC"]}).then((device) => {
+        adapter.requestDevice({ extensions: ["textureCompressionBC"]}).then(function(device) {
             var gpuContext = document.getElementById("canvas").getContext("gpupresent");
             console.log("wgpu device extensions: " + adapter.extensions);
-            gpuContext.getSwapChainPreferredFormat(device).then((fmt) => {
-                const swapChainDescriptor = { device: device, format: fmt };
-                const swapChain = gpuContext.configureSwapChain(swapChainDescriptor);
-                const deviceId = WebGPU.mgrDevice.create(device);
-                const swapChainId = WebGPU.mgrSwapChain.create(swapChain);
-                const fmtId = WebGPU.TextureFormat.findIndex(function(elm) { return elm==fmt; });
+            gpuContext.getSwapChainPreferredFormat(device).then(function(fmt) {
+                var swapChainDescriptor = { device: device, format: fmt };
+                var swapChain = gpuContext.configureSwapChain(swapChainDescriptor);
+                var deviceId = WebGPU.mgrDevice.create(device);
+                var swapChainId = WebGPU.mgrSwapChain.create(swapChain);
+                var fmtId = WebGPU.TextureFormat.findIndex(function(elm) { return elm==fmt; });
                 console.log("wgpu device: " + device);
                 console.log("wgpu swap chain: " + swapChain);
                 console.log("wgpu preferred format: " + fmt + " (" + fmtId + ")");
@@ -5694,7 +5447,7 @@ _SOKOL_PRIVATE EM_BOOL _sapp_emsc_frame(double time, void* userData) {
 
 _SOKOL_PRIVATE void _sapp_emsc_run(const sapp_desc* desc) {
     _sapp_init_state(desc);
-    sapp_js_init(&_sapp.html5_canvas_selector[1]);
+    sapp_js_pointer_init(&_sapp.html5_canvas_selector[1]);
     double w, h;
     if (_sapp.desc.html5_canvas_resize) {
         w = (double) _sapp_def(_sapp.desc.width, _SAPP_FALLBACK_DEFAULT_WINDOW_WIDTH);
@@ -5707,10 +5460,10 @@ _SOKOL_PRIVATE void _sapp_emsc_run(const sapp_desc* desc) {
     if (_sapp.desc.high_dpi) {
         _sapp.dpi_scale = emscripten_get_device_pixel_ratio();
     }
-    _sapp.window_width = (int)roundf(w);
-    _sapp.window_height = (int)roundf(h);
-    _sapp.framebuffer_width = (int)roundf(w * _sapp.dpi_scale);
-    _sapp.framebuffer_height = (int)roundf(h * _sapp.dpi_scale);
+    _sapp.window_width = (int) w;
+    _sapp.window_height = (int) h;
+    _sapp.framebuffer_width = (int) (w * _sapp.dpi_scale);
+    _sapp.framebuffer_height = (int) (h * _sapp.dpi_scale);
     emscripten_set_canvas_element_size(_sapp.html5_canvas_selector, _sapp.framebuffer_width, _sapp.framebuffer_height);
     #if defined(SOKOL_GLES2) || defined(SOKOL_GLES3)
         _sapp_emsc_webgl_init();
@@ -6159,34 +5912,6 @@ _SOKOL_PRIVATE void _sapp_d3d11_create_device_and_swapchain(void) {
         &feature_level,                 /* pFeatureLevel */
         &_sapp.d3d11.device_context);   /* ppImmediateContext */
     _SOKOL_UNUSED(hr);
-    #if defined(SOKOL_DEBUG)
-    if (!SUCCEEDED(hr)) {
-        // if initialization with D3D11_CREATE_DEVICE_DEBUG failes, this could be because the
-        // 'D3D11 debug layer' stopped working, indicated by the error message:
-        // ===
-        // D3D11CreateDevice: Flags (0x2) were specified which require the D3D11 SDK Layers for Windows 10, but they are not present on the system.
-        // These flags must be removed, or the Windows 10 SDK must be installed.
-        // Flags include: D3D11_CREATE_DEVICE_DEBUG
-        // ===
-        //
-        // ...just retry with the DEBUG flag switched off
-        SAPP_LOG("sokol_app.h: D3D11CreateDeviceAndSwapChain() with D3D11_CREATE_DEVICE_DEBUG failed, retrying without debug flag.\n");
-        create_flags &= ~D3D11_CREATE_DEVICE_DEBUG;
-        hr = D3D11CreateDeviceAndSwapChain(
-            NULL,                           /* pAdapter (use default) */
-            D3D_DRIVER_TYPE_HARDWARE,       /* DriverType */
-            NULL,                           /* Software */
-            create_flags,                   /* Flags */
-            NULL,                           /* pFeatureLevels */
-            0,                              /* FeatureLevels */
-            D3D11_SDK_VERSION,              /* SDKVersion */
-            sc_desc,                        /* pSwapChainDesc */
-            &_sapp.d3d11.swap_chain,        /* ppSwapChain */
-            &_sapp.d3d11.device,            /* ppDevice */
-            &feature_level,                 /* pFeatureLevel */
-            &_sapp.d3d11.device_context);   /* ppImmediateContext */
-    }
-    #endif
     SOKOL_ASSERT(SUCCEEDED(hr) && _sapp.d3d11.swap_chain && _sapp.d3d11.device && _sapp.d3d11.device_context);
 
     // mimimize frame latency, disable Alt-Enter
@@ -6203,16 +5928,16 @@ _SOKOL_PRIVATE void _sapp_d3d11_create_device_and_swapchain(void) {
                 _SAPP_SAFE_RELEASE(dxgi_factory);
             }
             else {
-                SAPP_LOG("sokol_app.h: could not obtain IDXGIFactory object.\n");
+                SOKOL_LOG("sokol_app.h: could not obtain IDXGIFactory object.\n");
             }
             _SAPP_SAFE_RELEASE(dxgi_adapter);
         }
         else {
-            SAPP_LOG("sokol_app.h: could not obtain IDXGIAdapter object.\n");
+            SOKOL_LOG("sokol_app.h: could not obtain IDXGIAdapter object.\n");
         }
     }
     else {
-        SAPP_LOG("sokol_app.h: could not obtain IDXGIDevice1 interface\n");
+        SOKOL_LOG("sokol_app.h: could not obtain IDXGIDevice1 interface\n");
     }
 }
 
@@ -6512,8 +6237,8 @@ _SOKOL_PRIVATE void _sapp_wgl_create_context(void) {
         _sapp_fail("WGL: ARB_create_context_profile required!\n");
     }
     const int attrs[] = {
-        WGL_CONTEXT_MAJOR_VERSION_ARB, _sapp.desc.gl_major_version,
-        WGL_CONTEXT_MINOR_VERSION_ARB, _sapp.desc.gl_minor_version,
+        WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+        WGL_CONTEXT_MINOR_VERSION_ARB, 3,
         WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
         WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
         0, 0
@@ -6571,12 +6296,10 @@ _SOKOL_PRIVATE bool _sapp_win32_wide_to_utf8(const wchar_t* src, char* dst, int 
 _SOKOL_PRIVATE bool _sapp_win32_update_dimensions(void) {
     RECT rect;
     if (GetClientRect(_sapp.win32.hwnd, &rect)) {
-        float window_width = (float)(rect.right - rect.left) / _sapp.win32.dpi.window_scale;
-        float window_height = (float)(rect.bottom - rect.top) / _sapp.win32.dpi.window_scale;
-        _sapp.window_width = (int)roundf(window_width);
-        _sapp.window_height = (int)roundf(window_height);
-        int fb_width = (int)roundf(window_width * _sapp.win32.dpi.content_scale);
-        int fb_height = (int)roundf(window_height * _sapp.win32.dpi.content_scale);
+        _sapp.window_width = (int)((float)(rect.right - rect.left) / _sapp.win32.dpi.window_scale);
+        _sapp.window_height = (int)((float)(rect.bottom - rect.top) / _sapp.win32.dpi.window_scale);
+        int fb_width = (int)((float)_sapp.window_width * _sapp.win32.dpi.content_scale);
+        int fb_height = (int)((float)_sapp.window_height * _sapp.win32.dpi.content_scale);
         /* prevent a framebuffer size of 0 when window is minimized */
         if (0 == fb_width) {
             fb_width = 1;
@@ -6637,73 +6360,9 @@ _SOKOL_PRIVATE void _sapp_win32_toggle_fullscreen(void) {
     _sapp_win32_set_fullscreen(!_sapp.fullscreen, SWP_SHOWWINDOW);
 }
 
-_SOKOL_PRIVATE void _sapp_win32_init_cursor(sapp_mouse_cursor cursor) {
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    // NOTE: the OCR_* constants are only defined if OEMRESOURCE is defined
-    // before windows.h is included, but we can't guarantee that because
-    // the sokol_app.h implementation may be included with other implementations
-    // in the same compilation unit
-    int id = 0;
-    switch (cursor) {
-        case SAPP_MOUSECURSOR_ARROW:            id = 32512; break;  // OCR_NORMAL
-        case SAPP_MOUSECURSOR_IBEAM:            id = 32513; break;  // OCR_IBEAM
-        case SAPP_MOUSECURSOR_CROSSHAIR:        id = 32515; break;  // OCR_CROSS
-        case SAPP_MOUSECURSOR_POINTING_HAND:    id = 32649; break;  // OCR_HAND
-        case SAPP_MOUSECURSOR_RESIZE_EW:        id = 32644; break;  // OCR_SIZEWE
-        case SAPP_MOUSECURSOR_RESIZE_NS:        id = 32645; break;  // OCR_SIZENS
-        case SAPP_MOUSECURSOR_RESIZE_NWSE:      id = 32642; break;  // OCR_SIZENWSE
-        case SAPP_MOUSECURSOR_RESIZE_NESW:      id = 32643; break;  // OCR_SIZENESW
-        case SAPP_MOUSECURSOR_RESIZE_ALL:       id = 32646; break;  // OCR_SIZEALL
-        case SAPP_MOUSECURSOR_NOT_ALLOWED:      id = 32648; break;  // OCR_NO
-        default: break;
-    }
-    if (id != 0) {
-        _sapp.win32.cursors[cursor] = (HCURSOR)LoadImageW(NULL, MAKEINTRESOURCEW(id), IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE|LR_SHARED);
-    }
-    // fallback: default cursor
-    if (0 == _sapp.win32.cursors[cursor]) {
-        // 32512 => IDC_ARROW
-        _sapp.win32.cursors[cursor] = LoadCursorW(NULL, MAKEINTRESOURCEW(32512));
-    }
-    SOKOL_ASSERT(0 != _sapp.win32.cursors[cursor]);
-}
-
-_SOKOL_PRIVATE void _sapp_win32_init_cursors(void) {
-    for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
-        _sapp_win32_init_cursor((sapp_mouse_cursor)i);
-    }
-}
-
-_SOKOL_PRIVATE bool _sapp_win32_cursor_in_content_area(void) {
-    POINT pos;
-    if (!GetCursorPos(&pos)) {
-        return false;
-    }
-    if (WindowFromPoint(pos) != _sapp.win32.hwnd) {
-        return false;
-    }
-    RECT area;
-    GetClientRect(_sapp.win32.hwnd, &area);
-    ClientToScreen(_sapp.win32.hwnd, (POINT*)&area.left);
-    ClientToScreen(_sapp.win32.hwnd, (POINT*)&area.right);
-    return PtInRect(&area, pos) == TRUE;
-}
-
-_SOKOL_PRIVATE void _sapp_win32_update_cursor(sapp_mouse_cursor cursor, bool shown, bool skip_area_test) {
-    // NOTE: when called from WM_SETCURSOR, the area test would be redundant
-    if (!skip_area_test) {
-        if (!_sapp_win32_cursor_in_content_area()) {
-            return;
-        }
-    }
-    if (!shown) {
-        SetCursor(NULL);
-    }
-    else {
-        SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-        SOKOL_ASSERT(0 != _sapp.win32.cursors[cursor]);
-        SetCursor(_sapp.win32.cursors[cursor]);
-    }
+_SOKOL_PRIVATE void _sapp_win32_show_mouse(bool visible) {
+    /* NOTE: this function is only called when the mouse visibility actually changes */
+    ShowCursor((BOOL)visible);
 }
 
 _SOKOL_PRIVATE void _sapp_win32_capture_mouse(uint8_t btn_mask) {
@@ -6761,7 +6420,7 @@ _SOKOL_PRIVATE void _sapp_win32_lock_mouse(bool lock) {
             _sapp.win32.hwnd    // hwndTarget
         };
         if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
-            SAPP_LOG("RegisterRawInputDevices() failed (on mouse lock).\n");
+            SOKOL_LOG("RegisterRawInputDevices() failed (on mouse lock).\n");
         }
         /* in case the raw mouse device only supports absolute position reporting,
            we need to skip the dx/dy compution for the first WM_INPUT event
@@ -6772,7 +6431,7 @@ _SOKOL_PRIVATE void _sapp_win32_lock_mouse(bool lock) {
         /* disable raw input for mouse */
         const RAWINPUTDEVICE rid = { 0x01, 0x02, RIDEV_REMOVE, NULL };
         if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
-            SAPP_LOG("RegisterRawInputDevices() failed (on mouse unlock).\n");
+            SOKOL_LOG("RegisterRawInputDevices() failed (on mouse unlock).\n");
         }
 
         /* let the mouse roam freely again */
@@ -6912,7 +6571,7 @@ _SOKOL_PRIVATE void _sapp_win32_files_dropped(HDROP hdrop) {
         WCHAR* buffer = (WCHAR*) _sapp_malloc_clear(num_chars * sizeof(WCHAR));
         DragQueryFileW(hdrop, i, buffer, num_chars);
         if (!_sapp_win32_wide_to_utf8(buffer, _sapp_dropped_file_path_ptr((int)i), _sapp.drop.max_path_length)) {
-            SAPP_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)\n");
+            SOKOL_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)\n");
             drop_failed = true;
         }
         _sapp_free(buffer);
@@ -7019,9 +6678,11 @@ _SOKOL_PRIVATE LRESULT CALLBACK _sapp_win32_wndproc(HWND hWnd, UINT uMsg, WPARAM
                 _sapp_win32_uwp_app_event(SAPP_EVENTTYPE_UNFOCUSED);
                 break;
             case WM_SETCURSOR:
-                if (LOWORD(lParam) == HTCLIENT) {
-                    _sapp_win32_update_cursor(_sapp.mouse.current_cursor, _sapp.mouse.shown, true);
-                    return TRUE;
+                if (_sapp.desc.user_cursor) {
+                    if (LOWORD(lParam) == HTCLIENT) {
+                        _sapp_win32_uwp_app_event(SAPP_EVENTTYPE_UPDATE_CURSOR);
+                        return 1;
+                    }
                 }
                 break;
             case WM_DPICHANGED:
@@ -7088,7 +6749,7 @@ _SOKOL_PRIVATE LRESULT CALLBACK _sapp_win32_wndproc(HWND hWnd, UINT uMsg, WPARAM
                     UINT size = sizeof(_sapp.win32.raw_input_data);
                     // see: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getrawinputdata
                     if ((UINT)-1 == GetRawInputData(ri, RID_INPUT, &_sapp.win32.raw_input_data, &size, sizeof(RAWINPUTHEADER))) {
-                        SAPP_LOG("GetRawInputData() failed\n");
+                        SOKOL_LOG("GetRawInputData() failed\n");
                         break;
                     }
                     const RAWINPUT* raw_mouse_data = (const RAWINPUT*) &_sapp.win32.raw_input_data;
@@ -7280,7 +6941,6 @@ _SOKOL_PRIVATE void _sapp_win32_init_console(void) {
             FILE* res_fp = 0;
             errno_t err;
             err = freopen_s(&res_fp, "CON", "w", stdout);
-            (void)err;
             err = freopen_s(&res_fp, "CON", "w", stderr);
             (void)err;
         }
@@ -7439,7 +7099,7 @@ _SOKOL_PRIVATE const char* _sapp_win32_get_clipboard_string(void) {
         return _sapp.clipboard.buffer;
     }
     if (!_sapp_win32_wide_to_utf8(wchar_buf, _sapp.clipboard.buffer, _sapp.clipboard.buf_size)) {
-        SAPP_LOG("sokol_app.h: clipboard string didn't fit into clipboard buffer\n");
+        SOKOL_LOG("sokol_app.h: clipboard string didn't fit into clipboard buffer\n");
     }
     GlobalUnlock(object);
     CloseClipboard();
@@ -7552,7 +7212,6 @@ _SOKOL_PRIVATE void _sapp_win32_run(const sapp_desc* desc) {
     _sapp_win32_uwp_init_keytable();
     _sapp_win32_uwp_utf8_to_wide(_sapp.window_title, _sapp.window_title_wide, sizeof(_sapp.window_title_wide));
     _sapp_win32_init_dpi();
-    _sapp_win32_init_cursors();
     _sapp_win32_create_window();
     sapp_set_icon(&desc->icon);
     #if defined(SOKOL_D3D11)
@@ -7698,26 +7357,13 @@ _SOKOL_PRIVATE void _sapp_uwp_configure_dpi(float monitor_dpi) {
     _sapp.dpi_scale = _sapp.uwp.dpi.content_scale;
 }
 
-_SOKOL_PRIVATE void _sapp_uwp_update_cursor(sapp_mouse_cursor cursor, bool shown) {
+_SOKOL_PRIVATE void _sapp_uwp_show_mouse(bool visible) {
     using namespace winrt::Windows::UI::Core;
 
-    CoreCursor uwp_cursor(nullptr);
-    if (shown) {
-        switch (cursor) {
-            case SAPP_MOUSECURSOR_ARROW: uwp_cursor = CoreCursor(CoreCursorType::Arrow, 0); break;
-            case SAPP_MOUSECURSOR_IBEAM: uwp_cursor = CoreCursor(CoreCursorType::IBeam, 0); break;
-            case SAPP_MOUSECURSOR_CROSSHAIR: uwp_cursor = CoreCursor(CoreCursorType::Cross, 0); break;
-            case SAPP_MOUSECURSOR_POINTING_HAND: uwp_cursor = CoreCursor(CoreCursorType::Hand, 0); break;
-            case SAPP_MOUSECURSOR_RESIZE_EW: uwp_cursor = CoreCursor(CoreCursorType::SizeWestEast, 0); break;
-            case SAPP_MOUSECURSOR_RESIZE_NS: uwp_cursor = CoreCursor(CoreCursorType::SizeNorthSouth, 0); break;
-            case SAPP_MOUSECURSOR_RESIZE_NWSE: uwp_cursor = CoreCursor(CoreCursorType::SizeNorthwestSoutheast, 0); break;
-            case SAPP_MOUSECURSOR_RESIZE_NESW: uwp_cursor = CoreCursor(CoreCursorType::SizeNortheastSouthwest, 0); break;
-            case SAPP_MOUSECURSOR_RESIZE_ALL: uwp_cursor = CoreCursor(CoreCursorType::SizeAll, 0); break;
-            case SAPP_MOUSECURSOR_NOT_ALLOWED: uwp_cursor = CoreCursor(CoreCursorType::UniversalNo, 0); break;
-            default: uwp_cursor = CoreCursor(CoreCursorType::Arrow, 0); break;
-        }
-    }
-    CoreWindow::GetForCurrentThread().PointerCursor(uwp_cursor);
+    /* NOTE: this function is only called when the mouse visibility actually changes */
+    CoreWindow::GetForCurrentThread().PointerCursor(visible ?
+        CoreCursor(CoreCursorType::Arrow, 0) :
+        CoreCursor(nullptr));
 }
 
 _SOKOL_PRIVATE uint32_t _sapp_uwp_mods(winrt::Windows::UI::Core::CoreWindow const& sender_window) {
@@ -8724,7 +8370,6 @@ _SOKOL_PRIVATE bool _sapp_android_init_egl(void) {
     if (eglInitialize(display, NULL, NULL) == EGL_FALSE) {
         return false;
     }
-    _sapp.gles2_fallback = _sapp.desc.gl_force_gles2;
 
     EGLint alpha_size = _sapp.desc.alpha ? 8 : 0;
     const EGLint cfg_attributes[] = {
@@ -8792,16 +8437,16 @@ _SOKOL_PRIVATE void _sapp_android_cleanup_egl(void) {
     if (_sapp.android.display != EGL_NO_DISPLAY) {
         eglMakeCurrent(_sapp.android.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         if (_sapp.android.surface != EGL_NO_SURFACE) {
-            SAPP_LOG("Destroying egl surface");
+            SOKOL_LOG("Destroying egl surface");
             eglDestroySurface(_sapp.android.display, _sapp.android.surface);
             _sapp.android.surface = EGL_NO_SURFACE;
         }
         if (_sapp.android.context != EGL_NO_CONTEXT) {
-            SAPP_LOG("Destroying egl context");
+            SOKOL_LOG("Destroying egl context");
             eglDestroyContext(_sapp.android.display, _sapp.android.context);
             _sapp.android.context = EGL_NO_CONTEXT;
         }
-        SAPP_LOG("Terminating egl display");
+        SOKOL_LOG("Terminating egl display");
         eglTerminate(_sapp.android.display);
         _sapp.android.display = EGL_NO_DISPLAY;
     }
@@ -8842,7 +8487,7 @@ _SOKOL_PRIVATE void _sapp_android_cleanup_egl_surface(void) {
 _SOKOL_PRIVATE void _sapp_android_app_event(sapp_event_type type) {
     if (_sapp_events_enabled()) {
         _sapp_init_event(type);
-        SAPP_LOG("event_cb()");
+        SOKOL_LOG("event_cb()");
         _sapp_call_event(&_sapp.event);
     }
 }
@@ -8865,14 +8510,14 @@ _SOKOL_PRIVATE void _sapp_android_update_dimensions(ANativeWindow* window, bool 
             const int32_t buf_h = win_h / 2;
             EGLint format;
             EGLBoolean egl_result = eglGetConfigAttrib(_sapp.android.display, _sapp.android.config, EGL_NATIVE_VISUAL_ID, &format);
-            SOKOL_ASSERT(egl_result == EGL_TRUE); _SOKOL_UNUSED(egl_result);
+            SOKOL_ASSERT(egl_result == EGL_TRUE);
             /* NOTE: calling ANativeWindow_setBuffersGeometry() with the same dimensions
                 as the ANativeWindow size results in weird display artefacts, that's
                 why it's only called when the buffer geometry is different from
                 the window size
             */
             int32_t result = ANativeWindow_setBuffersGeometry(window, buf_w, buf_h, format);
-            SOKOL_ASSERT(result == 0); _SOKOL_UNUSED(result);
+            SOKOL_ASSERT(result == 0);
         }
     }
 
@@ -8880,26 +8525,26 @@ _SOKOL_PRIVATE void _sapp_android_update_dimensions(ANativeWindow* window, bool 
     EGLint fb_w, fb_h;
     EGLBoolean egl_result_w = eglQuerySurface(_sapp.android.display, _sapp.android.surface, EGL_WIDTH, &fb_w);
     EGLBoolean egl_result_h = eglQuerySurface(_sapp.android.display, _sapp.android.surface, EGL_HEIGHT, &fb_h);
-    SOKOL_ASSERT(egl_result_w == EGL_TRUE); _SOKOL_UNUSED(egl_result_w);
-    SOKOL_ASSERT(egl_result_h == EGL_TRUE); _SOKOL_UNUSED(egl_result_h);
+    SOKOL_ASSERT(egl_result_w == EGL_TRUE);
+    SOKOL_ASSERT(egl_result_h == EGL_TRUE);
     const bool fb_changed = (fb_w != _sapp.framebuffer_width) || (fb_h != _sapp.framebuffer_height);
     _sapp.framebuffer_width = fb_w;
     _sapp.framebuffer_height = fb_h;
     _sapp.dpi_scale = (float)_sapp.framebuffer_width / (float)_sapp.window_width;
     if (win_changed || fb_changed || force_update) {
         if (!_sapp.first_frame) {
-            SAPP_LOG("SAPP_EVENTTYPE_RESIZED");
+            SOKOL_LOG("SAPP_EVENTTYPE_RESIZED");
             _sapp_android_app_event(SAPP_EVENTTYPE_RESIZED);
         }
     }
 }
 
 _SOKOL_PRIVATE void _sapp_android_cleanup(void) {
-    SAPP_LOG("Cleaning up");
+    SOKOL_LOG("Cleaning up");
     if (_sapp.android.surface != EGL_NO_SURFACE) {
         /* egl context is bound, cleanup gracefully */
         if (_sapp.init_called && !_sapp.cleanup_called) {
-            SAPP_LOG("cleanup_cb()");
+            SOKOL_LOG("cleanup_cb()");
             _sapp_call_cleanup();
         }
     }
@@ -8936,22 +8581,22 @@ _SOKOL_PRIVATE bool _sapp_android_touch_event(const AInputEvent* e) {
     sapp_event_type type = SAPP_EVENTTYPE_INVALID;
     switch (action) {
         case AMOTION_EVENT_ACTION_DOWN:
-            SAPP_LOG("Touch: down");
+            SOKOL_LOG("Touch: down");
         case AMOTION_EVENT_ACTION_POINTER_DOWN:
-            SAPP_LOG("Touch: ptr down");
+            SOKOL_LOG("Touch: ptr down");
             type = SAPP_EVENTTYPE_TOUCHES_BEGAN;
             break;
         case AMOTION_EVENT_ACTION_MOVE:
             type = SAPP_EVENTTYPE_TOUCHES_MOVED;
             break;
         case AMOTION_EVENT_ACTION_UP:
-            SAPP_LOG("Touch: up");
+            SOKOL_LOG("Touch: up");
         case AMOTION_EVENT_ACTION_POINTER_UP:
-            SAPP_LOG("Touch: ptr up");
+            SOKOL_LOG("Touch: ptr up");
             type = SAPP_EVENTTYPE_TOUCHES_ENDED;
             break;
         case AMOTION_EVENT_ACTION_CANCEL:
-            SAPP_LOG("Touch: cancel");
+            SOKOL_LOG("Touch: cancel");
             type = SAPP_EVENTTYPE_TOUCHES_CANCELLED;
             break;
         default:
@@ -8971,7 +8616,7 @@ _SOKOL_PRIVATE bool _sapp_android_touch_event(const AInputEvent* e) {
         dst->identifier = (uintptr_t)AMotionEvent_getPointerId(e, (size_t)i);
         dst->pos_x = (AMotionEvent_getRawX(e, (size_t)i) / _sapp.window_width) * _sapp.framebuffer_width;
         dst->pos_y = (AMotionEvent_getRawY(e, (size_t)i) / _sapp.window_height) * _sapp.framebuffer_height;
-        dst->android_tooltype = (sapp_android_tooltype) AMotionEvent_getToolType(e, (size_t)i);
+
         if (action == AMOTION_EVENT_ACTION_POINTER_DOWN ||
             action == AMOTION_EVENT_ACTION_POINTER_UP) {
             dst->changed = (i == idx);
@@ -8999,10 +8644,8 @@ _SOKOL_PRIVATE bool _sapp_android_key_event(const AInputEvent* e) {
 }
 
 _SOKOL_PRIVATE int _sapp_android_input_cb(int fd, int events, void* data) {
-    _SOKOL_UNUSED(fd);
-    _SOKOL_UNUSED(data);
     if ((events & ALOOPER_EVENT_INPUT) == 0) {
-        SAPP_LOG("_sapp_android_input_cb() encountered unsupported event");
+        SOKOL_LOG("_sapp_android_input_cb() encountered unsupported event");
         return 1;
     }
     SOKOL_ASSERT(_sapp.android.current.input);
@@ -9021,15 +8664,14 @@ _SOKOL_PRIVATE int _sapp_android_input_cb(int fd, int events, void* data) {
 }
 
 _SOKOL_PRIVATE int _sapp_android_main_cb(int fd, int events, void* data) {
-    _SOKOL_UNUSED(data);
     if ((events & ALOOPER_EVENT_INPUT) == 0) {
-        SAPP_LOG("_sapp_android_main_cb() encountered unsupported event");
+        SOKOL_LOG("_sapp_android_main_cb() encountered unsupported event");
         return 1;
     }
 
     _sapp_android_msg_t msg;
     if (read(fd, &msg, sizeof(msg)) != sizeof(msg)) {
-        SAPP_LOG("Could not write to read_from_main_fd");
+        SOKOL_LOG("Could not write to read_from_main_fd");
         return 1;
     }
 
@@ -9037,45 +8679,45 @@ _SOKOL_PRIVATE int _sapp_android_main_cb(int fd, int events, void* data) {
     switch (msg) {
         case _SOKOL_ANDROID_MSG_CREATE:
             {
-                SAPP_LOG("MSG_CREATE");
+                SOKOL_LOG("MSG_CREATE");
                 SOKOL_ASSERT(!_sapp.valid);
                 bool result = _sapp_android_init_egl();
-                SOKOL_ASSERT(result); _SOKOL_UNUSED(result);
+                SOKOL_ASSERT(result);
                 _sapp.valid = true;
                 _sapp.android.has_created = true;
             }
             break;
         case _SOKOL_ANDROID_MSG_RESUME:
-            SAPP_LOG("MSG_RESUME");
+            SOKOL_LOG("MSG_RESUME");
             _sapp.android.has_resumed = true;
             _sapp_android_app_event(SAPP_EVENTTYPE_RESUMED);
             break;
         case _SOKOL_ANDROID_MSG_PAUSE:
-            SAPP_LOG("MSG_PAUSE");
+            SOKOL_LOG("MSG_PAUSE");
             _sapp.android.has_resumed = false;
             _sapp_android_app_event(SAPP_EVENTTYPE_SUSPENDED);
             break;
         case _SOKOL_ANDROID_MSG_FOCUS:
-            SAPP_LOG("MSG_FOCUS");
+            SOKOL_LOG("MSG_FOCUS");
             _sapp.android.has_focus = true;
             break;
         case _SOKOL_ANDROID_MSG_NO_FOCUS:
-            SAPP_LOG("MSG_NO_FOCUS");
+            SOKOL_LOG("MSG_NO_FOCUS");
             _sapp.android.has_focus = false;
             break;
         case _SOKOL_ANDROID_MSG_SET_NATIVE_WINDOW:
-            SAPP_LOG("MSG_SET_NATIVE_WINDOW");
+            SOKOL_LOG("MSG_SET_NATIVE_WINDOW");
             if (_sapp.android.current.window != _sapp.android.pending.window) {
                 if (_sapp.android.current.window != NULL) {
                     _sapp_android_cleanup_egl_surface();
                 }
                 if (_sapp.android.pending.window != NULL) {
-                    SAPP_LOG("Creating egl surface ...");
+                    SOKOL_LOG("Creating egl surface ...");
                     if (_sapp_android_init_egl_surface(_sapp.android.pending.window)) {
-                        SAPP_LOG("... ok!");
+                        SOKOL_LOG("... ok!");
                         _sapp_android_update_dimensions(_sapp.android.pending.window, true);
                     } else {
-                        SAPP_LOG("... failed!");
+                        SOKOL_LOG("... failed!");
                         _sapp_android_shutdown();
                     }
                 }
@@ -9083,7 +8725,7 @@ _SOKOL_PRIVATE int _sapp_android_main_cb(int fd, int events, void* data) {
             _sapp.android.current.window = _sapp.android.pending.window;
             break;
         case _SOKOL_ANDROID_MSG_SET_INPUT_QUEUE:
-            SAPP_LOG("MSG_SET_INPUT_QUEUE");
+            SOKOL_LOG("MSG_SET_INPUT_QUEUE");
             if (_sapp.android.current.input != _sapp.android.pending.input) {
                 if (_sapp.android.current.input != NULL) {
                     AInputQueue_detachLooper(_sapp.android.current.input);
@@ -9100,13 +8742,13 @@ _SOKOL_PRIVATE int _sapp_android_main_cb(int fd, int events, void* data) {
             _sapp.android.current.input = _sapp.android.pending.input;
             break;
         case _SOKOL_ANDROID_MSG_DESTROY:
-            SAPP_LOG("MSG_DESTROY");
+            SOKOL_LOG("MSG_DESTROY");
             _sapp_android_cleanup();
             _sapp.valid = false;
             _sapp.android.is_thread_stopping = true;
             break;
         default:
-            SAPP_LOG("Unknown msg type received");
+            SOKOL_LOG("Unknown msg type received");
             break;
     }
     pthread_cond_broadcast(&_sapp.android.pt.cond); /* signal "received" */
@@ -9124,17 +8766,17 @@ _SOKOL_PRIVATE void _sapp_android_show_keyboard(bool shown) {
     SOKOL_ASSERT(_sapp.valid);
     /* This seems to be broken in the NDK, but there is (a very cumbersome) workaround... */
     if (shown) {
-        SAPP_LOG("Showing keyboard");
+        SOKOL_LOG("Showing keyboard");
         ANativeActivity_showSoftInput(_sapp.android.activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
     } else {
-        SAPP_LOG("Hiding keyboard");
+        SOKOL_LOG("Hiding keyboard");
         ANativeActivity_hideSoftInput(_sapp.android.activity, ANATIVEACTIVITY_HIDE_SOFT_INPUT_NOT_ALWAYS);
     }
 }
 
 _SOKOL_PRIVATE void* _sapp_android_loop(void* arg) {
     _SOKOL_UNUSED(arg);
-    SAPP_LOG("Loop thread started");
+    SOKOL_LOG("Loop thread started");
 
     _sapp.android.looper = ALooper_prepare(0 /* or ALOOPER_PREPARE_ALLOW_NON_CALLBACKS*/);
     ALooper_addFd(_sapp.android.looper,
@@ -9179,38 +8821,34 @@ _SOKOL_PRIVATE void* _sapp_android_loop(void* arg) {
     _sapp.android.is_thread_stopped = true;
     pthread_cond_broadcast(&_sapp.android.pt.cond);
     pthread_mutex_unlock(&_sapp.android.pt.mutex);
-    SAPP_LOG("Loop thread done");
+    SOKOL_LOG("Loop thread done");
     return NULL;
 }
 
 /* android main/ui thread */
 _SOKOL_PRIVATE void _sapp_android_msg(_sapp_android_msg_t msg) {
     if (write(_sapp.android.pt.write_from_main_fd, &msg, sizeof(msg)) != sizeof(msg)) {
-        SAPP_LOG("Could not write to write_from_main_fd");
+        SOKOL_LOG("Could not write to write_from_main_fd");
     }
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_start(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onStart()");
+    SOKOL_LOG("NativeActivity onStart()");
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_resume(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onResume()");
+    SOKOL_LOG("NativeActivity onResume()");
     _sapp_android_msg(_SOKOL_ANDROID_MSG_RESUME);
 }
 
 _SOKOL_PRIVATE void* _sapp_android_on_save_instance_state(ANativeActivity* activity, size_t* out_size) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onSaveInstanceState()");
+    SOKOL_LOG("NativeActivity onSaveInstanceState()");
     *out_size = 0;
     return NULL;
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_window_focus_changed(ANativeActivity* activity, int has_focus) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onWindowFocusChanged()");
+    SOKOL_LOG("NativeActivity onWindowFocusChanged()");
     if (has_focus) {
         _sapp_android_msg(_SOKOL_ANDROID_MSG_FOCUS);
     } else {
@@ -9219,14 +8857,12 @@ _SOKOL_PRIVATE void _sapp_android_on_window_focus_changed(ANativeActivity* activ
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_pause(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onPause()");
+    SOKOL_LOG("NativeActivity onPause()");
     _sapp_android_msg(_SOKOL_ANDROID_MSG_PAUSE);
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_stop(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onStop()");
+    SOKOL_LOG("NativeActivity onStop()");
 }
 
 _SOKOL_PRIVATE void _sapp_android_msg_set_native_window(ANativeWindow* window) {
@@ -9240,15 +8876,12 @@ _SOKOL_PRIVATE void _sapp_android_msg_set_native_window(ANativeWindow* window) {
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_native_window_created(ANativeActivity* activity, ANativeWindow* window) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onNativeWindowCreated()");
+    SOKOL_LOG("NativeActivity onNativeWindowCreated()");
     _sapp_android_msg_set_native_window(window);
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_native_window_destroyed(ANativeActivity* activity, ANativeWindow* window) {
-    _SOKOL_UNUSED(activity);
-    _SOKOL_UNUSED(window);
-    SAPP_LOG("NativeActivity onNativeWindowDestroyed()");
+    SOKOL_LOG("NativeActivity onNativeWindowDestroyed()");
     _sapp_android_msg_set_native_window(NULL);
 }
 
@@ -9263,27 +8896,22 @@ _SOKOL_PRIVATE void _sapp_android_msg_set_input_queue(AInputQueue* input) {
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_input_queue_created(ANativeActivity* activity, AInputQueue* queue) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onInputQueueCreated()");
+    SOKOL_LOG("NativeActivity onInputQueueCreated()");
     _sapp_android_msg_set_input_queue(queue);
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_input_queue_destroyed(ANativeActivity* activity, AInputQueue* queue) {
-    _SOKOL_UNUSED(activity);
-    _SOKOL_UNUSED(queue);
-    SAPP_LOG("NativeActivity onInputQueueDestroyed()");
+    SOKOL_LOG("NativeActivity onInputQueueDestroyed()");
     _sapp_android_msg_set_input_queue(NULL);
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_config_changed(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onConfigurationChanged()");
+    SOKOL_LOG("NativeActivity onConfigurationChanged()");
     /* see android:configChanges in manifest */
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_low_memory(ANativeActivity* activity) {
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onLowMemory()");
+    SOKOL_LOG("NativeActivity onLowMemory()");
 }
 
 _SOKOL_PRIVATE void _sapp_android_on_destroy(ANativeActivity* activity) {
@@ -9295,8 +8923,7 @@ _SOKOL_PRIVATE void _sapp_android_on_destroy(ANativeActivity* activity) {
      * However, if ANativeActivity_finish() is explicitly called from for example
      * _sapp_android_on_stop(), the crash disappears. Is this a bug in NativeActivity?
      */
-    _SOKOL_UNUSED(activity);
-    SAPP_LOG("NativeActivity onDestroy()");
+    SOKOL_LOG("NativeActivity onDestroy()");
 
     /* send destroy msg */
     pthread_mutex_lock(&_sapp.android.pt.mutex);
@@ -9313,7 +8940,7 @@ _SOKOL_PRIVATE void _sapp_android_on_destroy(ANativeActivity* activity) {
     close(_sapp.android.pt.read_from_main_fd);
     close(_sapp.android.pt.write_from_main_fd);
 
-    SAPP_LOG("NativeActivity done");
+    SOKOL_LOG("NativeActivity done");
 
     /* this is a bit naughty, but causes a clean restart of the app (static globals are reset) */
     exit(0);
@@ -9321,23 +8948,17 @@ _SOKOL_PRIVATE void _sapp_android_on_destroy(ANativeActivity* activity) {
 
 JNIEXPORT
 void ANativeActivity_onCreate(ANativeActivity* activity, void* saved_state, size_t saved_state_size) {
-    _SOKOL_UNUSED(saved_state);
-    _SOKOL_UNUSED(saved_state_size);
-    SAPP_LOG("NativeActivity onCreate()");
+    SOKOL_LOG("NativeActivity onCreate()");
 
-    // the NativeActity pointer needs to be available inside sokol_main()
-    // (see https://github.com/floooh/sokol/issues/708), however _sapp_init_state()
-    // will clear the global _sapp_t struct, so we need to initialize the native
-    // activity pointer twice, once before sokol_main() and once after _sapp_init_state()
-    _sapp_clear(&_sapp, sizeof(_sapp));
-    _sapp.android.activity = activity;
     sapp_desc desc = sokol_main(0, NULL);
     _sapp_init_state(&desc);
+
+    /* start loop thread */
     _sapp.android.activity = activity;
 
     int pipe_fd[2];
     if (pipe(pipe_fd) != 0) {
-        SAPP_LOG("Could not create thread pipe");
+        SOKOL_LOG("Could not create thread pipe");
         return;
     }
     _sapp.android.pt.read_from_main_fd = pipe_fd[0];
@@ -9385,7 +9006,7 @@ void ANativeActivity_onCreate(ANativeActivity* activity, void* saved_state, size
     activity->callbacks->onConfigurationChanged = _sapp_android_on_config_changed;
     activity->callbacks->onLowMemory = _sapp_android_on_low_memory;
 
-    SAPP_LOG("NativeActivity successfully created");
+    SOKOL_LOG("NativeActivity successfully created");
 
     /* NOT A BUG: do NOT call sapp_discard_state() */
 }
@@ -10308,8 +9929,6 @@ _SOKOL_PRIVATE void _sapp_x11_query_system_dpi(void) {
     }
 }
 
-#if defined(_SAPP_GLX)
-
 _SOKOL_PRIVATE bool _sapp_glx_has_ext(const char* ext, const char* extensions) {
     SOKOL_ASSERT(ext);
     const char* start = extensions;
@@ -10523,8 +10142,8 @@ _SOKOL_PRIVATE void _sapp_glx_create_context(void) {
     }
     _sapp_x11_grab_error_handler();
     const int attribs[] = {
-        GLX_CONTEXT_MAJOR_VERSION_ARB, _sapp.desc.gl_major_version,
-        GLX_CONTEXT_MINOR_VERSION_ARB, _sapp.desc.gl_minor_version,
+        GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+        GLX_CONTEXT_MINOR_VERSION_ARB, 3,
         GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
         GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
         0, 0
@@ -10568,8 +10187,6 @@ _SOKOL_PRIVATE void _sapp_glx_swapinterval(int interval) {
         _sapp.glx.SwapIntervalMESA(interval);
     }
 }
-
-#endif /* _SAPP_GLX */
 
 _SOKOL_PRIVATE void _sapp_x11_send_event(Atom type, int a, int b, int c, int d, int e) {
     XEvent event;
@@ -10635,72 +10252,19 @@ _SOKOL_PRIVATE void _sapp_x11_create_hidden_cursor(void) {
     XcursorImageDestroy(img);
 }
 
- _SOKOL_PRIVATE void _sapp_x11_create_standard_cursor(sapp_mouse_cursor cursor, const char* name, const char* theme, int size, uint32_t fallback_native) {
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    SOKOL_ASSERT(_sapp.x11.display);
-    if (theme) {
-        XcursorImage* img = XcursorLibraryLoadImage(name, theme, size);
-        if (img) {
-            _sapp.x11.cursors[cursor] = XcursorImageLoadCursor(_sapp.x11.display, img);
-            XcursorImageDestroy(img);
-        }
-    }
-    if (0 == _sapp.x11.cursors[cursor]) {
-        _sapp.x11.cursors[cursor] = XCreateFontCursor(_sapp.x11.display, fallback_native);
-    }
-}
-
-_SOKOL_PRIVATE void _sapp_x11_create_cursors(void) {
-    SOKOL_ASSERT(_sapp.x11.display);
-    const char* cursor_theme = XcursorGetTheme(_sapp.x11.display);
-    const int size = XcursorGetDefaultSize(_sapp.x11.display);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_ARROW, "default", cursor_theme, size, XC_left_ptr);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_IBEAM, "text", cursor_theme, size, XC_xterm);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_CROSSHAIR, "crosshair", cursor_theme, size, XC_crosshair);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_POINTING_HAND, "pointer", cursor_theme, size, XC_hand2);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_RESIZE_EW, "ew-resize", cursor_theme, size, XC_sb_h_double_arrow);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_RESIZE_NS, "ns-resize", cursor_theme, size, XC_sb_v_double_arrow);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_RESIZE_NWSE, "nwse-resize", cursor_theme, size, 0);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_RESIZE_NESW, "nesw-resize", cursor_theme, size, 0);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_RESIZE_ALL, "all-scroll", cursor_theme, size, XC_fleur);
-    _sapp_x11_create_standard_cursor(SAPP_MOUSECURSOR_NOT_ALLOWED, "no-allowed", cursor_theme, size, 0);
-    _sapp_x11_create_hidden_cursor();
-}
-
-_SOKOL_PRIVATE void _sapp_x11_destroy_cursors(void) {
-    SOKOL_ASSERT(_sapp.x11.display);
-    if (_sapp.x11.hidden_cursor) {
-        XFreeCursor(_sapp.x11.display, _sapp.x11.hidden_cursor);
-        _sapp.x11.hidden_cursor = 0;
-    }
-    for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
-        if (_sapp.x11.cursors[i]) {
-            XFreeCursor(_sapp.x11.display, _sapp.x11.cursors[i]);
-            _sapp.x11.cursors[i] = 0;
-        }
-    }
-}
-
 _SOKOL_PRIVATE void _sapp_x11_toggle_fullscreen(void) {
     _sapp.fullscreen = !_sapp.fullscreen;
     _sapp_x11_set_fullscreen(_sapp.fullscreen);
     _sapp_x11_query_window_size();
 }
 
-_SOKOL_PRIVATE void _sapp_x11_update_cursor(sapp_mouse_cursor cursor, bool shown) {
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    if (shown) {
-        if (_sapp.x11.cursors[cursor]) {
-            XDefineCursor(_sapp.x11.display, _sapp.x11.window, _sapp.x11.cursors[cursor]);
-        }
-        else {
-            XUndefineCursor(_sapp.x11.display, _sapp.x11.window);
-        }
+_SOKOL_PRIVATE void _sapp_x11_show_mouse(bool show) {
+    if (show) {
+        XUndefineCursor(_sapp.x11.display, _sapp.x11.window);
     }
     else {
         XDefineCursor(_sapp.x11.display, _sapp.x11.window, _sapp.x11.hidden_cursor);
     }
-    XFlush(_sapp.x11.display);
 }
 
 _SOKOL_PRIVATE void _sapp_x11_lock_mouse(bool lock) {
@@ -11253,7 +10817,7 @@ _SOKOL_PRIVATE bool _sapp_x11_parse_dropped_files_list(const char* src) {
                 ((src_count == 6) && (src_chr != '/')) ||
                 ((src_count == 7) && (src_chr != '/')))
             {
-                SAPP_LOG("sokol_app.h: dropped file URI doesn't start with file://");
+                SOKOL_LOG("sokol_app.h: dropped file URI doesn't start with file://");
                 err = true;
                 break;
             }
@@ -11262,6 +10826,7 @@ _SOKOL_PRIVATE bool _sapp_x11_parse_dropped_files_list(const char* src) {
             // skip
         }
         else if (src_chr == '\n') {
+            src_chr = 0;
             src_count = 0;
             _sapp.drop.num_files++;
             // too many files is not an error
@@ -11272,7 +10837,7 @@ _SOKOL_PRIVATE bool _sapp_x11_parse_dropped_files_list(const char* src) {
             dst_end_ptr = dst_ptr + (_sapp.drop.max_path_length - 1);
         }
         else if ((src_chr == '%') && src[0] && src[1]) {
-            // a percent-encoded byte (most likely UTF-8 multibyte sequence)
+            // a percent-encoded byte (most like UTF-8 multibyte sequence)
             const char digits[3] = { src[0], src[1], 0 };
             src += 2;
             dst_chr = (char) strtol(digits, 0, 16);
@@ -11286,7 +10851,7 @@ _SOKOL_PRIVATE bool _sapp_x11_parse_dropped_files_list(const char* src) {
                 *dst_ptr++ = dst_chr;
             }
             else {
-                SAPP_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)");
+                SOKOL_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)");
                 err = true;
                 break;
             }
@@ -11592,147 +11157,6 @@ _SOKOL_PRIVATE void _sapp_x11_process_event(XEvent* event) {
     }
 }
 
-#if !defined(_SAPP_GLX)
-
-_SOKOL_PRIVATE void _sapp_egl_init(void) {
-#if defined(SOKOL_GLCORE33)
-    if (!eglBindAPI(EGL_OPENGL_API)) {
-        _sapp_fail("EGL: failed to bind API");
-    }
-#else
-    if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-        _sapp_fail("EGL: failed to bind API");
-    }
-#endif
-
-    _sapp.egl.display = eglGetDisplay((EGLNativeDisplayType)_sapp.x11.display);
-    if (EGL_NO_DISPLAY == _sapp.egl.display) {
-        _sapp_fail("EGL: failed to get display");
-    }
-
-    EGLint major, minor;
-    if (!eglInitialize(_sapp.egl.display, &major, &minor)) {
-        _sapp_fail("EGL: failed to initialize");
-    }
-
-    EGLint sample_count = _sapp.desc.sample_count > 1 ? _sapp.desc.sample_count : 0;
-    EGLint alpha_size = _sapp.desc.alpha ? 8 : 0;
-    const EGLint config_attrs[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        #if defined(SOKOL_GLCORE33)
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
-        #elif defined(SOKOL_GLES3)
-            EGL_RENDERABLE_TYPE, _sapp.desc.gl_force_gles2 ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_ES3_BIT,
-        #else
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        #endif
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, alpha_size,
-        EGL_DEPTH_SIZE, 24,
-        EGL_STENCIL_SIZE, 8,
-        EGL_SAMPLE_BUFFERS, _sapp.desc.sample_count > 1 ? 1 : 0,
-        EGL_SAMPLES, sample_count,
-        EGL_NONE,
-    };
-
-    EGLConfig egl_configs[32];
-    EGLint config_count;
-    if (!eglChooseConfig(_sapp.egl.display, config_attrs, egl_configs, 32, &config_count) || config_count == 0) {
-        _sapp_fail("EGL: no available configs");
-    }
-
-    EGLConfig config = egl_configs[0];
-    for (int i = 0; i < config_count; ++i) {
-        EGLConfig c = egl_configs[i];
-        EGLint r, g, b, a, d, s, n;
-        if (eglGetConfigAttrib(_sapp.egl.display, c, EGL_RED_SIZE, &r) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_GREEN_SIZE, &g) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_BLUE_SIZE, &b) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_ALPHA_SIZE, &a) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_DEPTH_SIZE, &d) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_STENCIL_SIZE, &s) &&
-            eglGetConfigAttrib(_sapp.egl.display, c, EGL_SAMPLES, &n) &&
-            (r == 8) && (g == 8) && (b == 8) && (a == alpha_size) && (d == 24) && (s == 8) && (n == sample_count)) {
-            config = c;
-            break;
-        }
-    }
-
-    EGLint visual_id;
-    if (!eglGetConfigAttrib(_sapp.egl.display, config, EGL_NATIVE_VISUAL_ID, &visual_id)) {
-        _sapp_fail("EGL: failed to get native visual");
-    }
-
-    XVisualInfo visual_info_template;
-    _sapp_clear(&visual_info_template, sizeof(visual_info_template));
-    visual_info_template.visualid = (VisualID)visual_id;
-
-    int num_visuals;
-    XVisualInfo* visual_info = XGetVisualInfo(_sapp.x11.display, VisualIDMask, &visual_info_template, &num_visuals);
-    if (!visual_info) {
-        _sapp_fail("EGL: failed to get x11 visual");
-    }
-
-    _sapp_x11_create_window(visual_info->visual, visual_info->depth);
-    XFree(visual_info);
-
-    _sapp.egl.surface = eglCreateWindowSurface(_sapp.egl.display, config, (EGLNativeWindowType)_sapp.x11.window, NULL);
-    if (EGL_NO_SURFACE == _sapp.egl.surface) {
-        _sapp_fail("EGL: failed to create EGL surface");
-    }
-
-    EGLint ctx_attrs[] = {
-        #if defined(SOKOL_GLCORE33)
-            EGL_CONTEXT_MAJOR_VERSION, _sapp.desc.gl_major_version,
-            EGL_CONTEXT_MINOR_VERSION, _sapp.desc.gl_minor_version,
-            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
-        #elif defined(SOKOL_GLES3)
-            EGL_CONTEXT_CLIENT_VERSION, _sapp.desc.gl_force_gles2 ? 2 : 3,
-        #else
-            EGL_CONTEXT_CLIENT_VERSION, 2,
-        #endif
-        EGL_NONE,
-    };
-
-    _sapp.egl.context = eglCreateContext(_sapp.egl.display, config, EGL_NO_CONTEXT, ctx_attrs);
-    if (EGL_NO_CONTEXT == _sapp.egl.context) {
-        _sapp_fail("EGL: failed to create GL context");
-    }
-
-    if (!eglMakeCurrent(_sapp.egl.display, _sapp.egl.surface, _sapp.egl.surface, _sapp.egl.context)) {
-        _sapp_fail("EGL: failed to set current context");
-    }
-
-    eglSwapInterval(_sapp.egl.display, _sapp.swap_interval);
-
-#if defined(SOKOL_GLES3)
-    _sapp.gles2_fallback = _sapp.desc.gl_force_gles2;
-#endif
-}
-
-_SOKOL_PRIVATE void _sapp_egl_destroy(void) {
-    if (_sapp.egl.display != EGL_NO_DISPLAY) {
-        eglMakeCurrent(_sapp.egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-
-        if (_sapp.egl.context != EGL_NO_CONTEXT) {
-            eglDestroyContext(_sapp.egl.display, _sapp.egl.context);
-            _sapp.egl.context = EGL_NO_CONTEXT;
-        }
-
-        if (_sapp.egl.surface != EGL_NO_SURFACE) {
-            eglDestroySurface(_sapp.egl.display, _sapp.egl.surface);
-            _sapp.egl.surface = EGL_NO_SURFACE;
-        }
-
-        eglTerminate(_sapp.egl.display);
-        _sapp.egl.display = EGL_NO_DISPLAY;
-    }
-}
-
-#endif /* _SAPP_GLX */
-
 _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
     /* The following lines are here to trigger a linker error instead of an
         obscure runtime error if the user has forgotten to add -pthread to
@@ -11757,28 +11181,24 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
     _sapp_x11_query_system_dpi();
     _sapp.dpi_scale = _sapp.x11.dpi / 96.0f;
     _sapp_x11_init_extensions();
-    _sapp_x11_create_cursors();
-#if defined(_SAPP_GLX)
+    _sapp_x11_create_hidden_cursor();
     _sapp_glx_init();
     Visual* visual = 0;
     int depth = 0;
     _sapp_glx_choose_visual(&visual, &depth);
     _sapp_x11_create_window(visual, depth);
     _sapp_glx_create_context();
-    _sapp_glx_swapinterval(_sapp.swap_interval);
-#else
-    _sapp_egl_init();
-#endif
     sapp_set_icon(&desc->icon);
     _sapp.valid = true;
     _sapp_x11_show_window();
     if (_sapp.fullscreen) {
         _sapp_x11_set_fullscreen(true);
     }
-
+    _sapp_glx_swapinterval(_sapp.swap_interval);
     XFlush(_sapp.x11.display);
     while (!_sapp.quit_ordered) {
         _sapp_timing_measure(&_sapp.timing);
+        _sapp_glx_make_current();
         int count = XPending(_sapp.x11.display);
         while (count--) {
             XEvent event;
@@ -11786,11 +11206,7 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
             _sapp_x11_process_event(&event);
         }
         _sapp_frame();
-#if defined(_SAPP_GLX)
         _sapp_glx_swap_buffers();
-#else
-        eglSwapBuffers(_sapp.egl.display, _sapp.egl.surface);
-#endif
         XFlush(_sapp.x11.display);
         /* handle quit-requested, either from window or from sapp_request_quit() */
         if (_sapp.quit_requested && !_sapp.quit_ordered) {
@@ -11803,13 +11219,8 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
         }
     }
     _sapp_call_cleanup();
-#if defined(_SAPP_GLX)
     _sapp_glx_destroy_context();
-#else
-    _sapp_egl_destroy();
-#endif
     _sapp_x11_destroy_window();
-    _sapp_x11_destroy_cursors();
     XCloseDisplay(_sapp.x11.display);
     _sapp_discard_state();
 }
@@ -11930,28 +11341,6 @@ SOKOL_API_IMPL float sapp_dpi_scale(void) {
     return _sapp.dpi_scale;
 }
 
-SOKOL_APP_IMPL const void* sapp_egl_get_display(void) {
-    SOKOL_ASSERT(_sapp.valid);
-    #if defined(_SAPP_ANDROID)
-        return _sapp.android.display;
-    #elif defined(_SAPP_LINUX) && !defined(_SAPP_GLX)
-        return _sapp.egl.display;
-    #else
-        return 0;
-    #endif
-}
-
-SOKOL_APP_IMPL const void* sapp_egl_get_context(void) {
-    SOKOL_ASSERT(_sapp.valid);
-    #if defined(_SAPP_ANDROID)
-        return _sapp.android.context;
-    #elif defined(_SAPP_LINUX) && !defined(_SAPP_GLX)
-        return _sapp.egl.context;
-    #else
-        return 0;
-    #endif
-}
-
 SOKOL_API_IMPL bool sapp_gles2(void) {
     return _sapp.gles2_fallback;
 }
@@ -11992,15 +11381,13 @@ SOKOL_API_IMPL void sapp_toggle_fullscreen(void) {
 SOKOL_API_IMPL void sapp_show_mouse(bool show) {
     if (_sapp.mouse.shown != show) {
         #if defined(_SAPP_MACOS)
-        _sapp_macos_update_cursor(_sapp.mouse.current_cursor, show);
+        _sapp_macos_show_mouse(show);
         #elif defined(_SAPP_WIN32)
-        _sapp_win32_update_cursor(_sapp.mouse.current_cursor, show, false);
+        _sapp_win32_show_mouse(show);
         #elif defined(_SAPP_LINUX)
-        _sapp_x11_update_cursor(_sapp.mouse.current_cursor, show);
+        _sapp_x11_show_mouse(show);
         #elif defined(_SAPP_UWP)
-        _sapp_uwp_update_cursor(_sapp.mouse.current_cursor, show);
-        #elif defined(_SAPP_EMSCRIPTEN)
-        _sapp_emsc_update_cursor(_sapp.mouse.current_cursor, show);
+        _sapp_uwp_show_mouse(show);
         #endif
         _sapp.mouse.shown = show;
     }
@@ -12026,28 +11413,6 @@ SOKOL_API_IMPL void sapp_lock_mouse(bool lock) {
 
 SOKOL_API_IMPL bool sapp_mouse_locked(void) {
     return _sapp.mouse.locked;
-}
-
-SOKOL_API_IMPL void sapp_set_mouse_cursor(sapp_mouse_cursor cursor) {
-    SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
-    if (_sapp.mouse.current_cursor != cursor) {
-        #if defined(_SAPP_MACOS)
-        _sapp_macos_update_cursor(cursor, _sapp.mouse.shown);
-        #elif defined(_SAPP_WIN32)
-        _sapp_win32_update_cursor(cursor, _sapp.mouse.shown, false);
-        #elif defined(_SAPP_LINUX)
-        _sapp_x11_update_cursor(cursor, _sapp.mouse.shown);
-        #elif defined(_SAPP_UWP)
-        _sapp_uwp_update_cursor(cursor, _sapp.mouse.shown);
-        #elif defined(_SAPP_EMSCRIPTEN)
-        _sapp_emsc_update_cursor(cursor, _sapp.mouse.shown);
-        #endif
-        _sapp.mouse.current_cursor = cursor;
-    }
-}
-
-SOKOL_API_IMPL sapp_mouse_cursor sapp_get_mouse_cursor(void) {
-    return _sapp.mouse.current_cursor;
 }
 
 SOKOL_API_IMPL void sapp_request_quit(void) {
@@ -12176,15 +11541,15 @@ SOKOL_API_IMPL void sapp_html5_fetch_dropped_file(const sapp_html5_fetch_request
     SOKOL_ASSERT(_sapp.drop.enabled);
     SOKOL_ASSERT(request);
     SOKOL_ASSERT(request->callback);
-    SOKOL_ASSERT(request->buffer.ptr);
-    SOKOL_ASSERT(request->buffer.size > 0);
+    SOKOL_ASSERT(request->buffer_ptr);
+    SOKOL_ASSERT(request->buffer_size > 0);
     #if defined(_SAPP_EMSCRIPTEN)
         const int index = request->dropped_file_index;
         sapp_html5_fetch_error error_code = SAPP_HTML5_FETCH_ERROR_NO_ERROR;
         if ((index < 0) || (index >= _sapp.drop.num_files)) {
             error_code = SAPP_HTML5_FETCH_ERROR_OTHER;
         }
-        if (sapp_html5_get_dropped_file_size(index) > request->buffer.size) {
+        if (sapp_html5_get_dropped_file_size(index) > request->buffer_size) {
             error_code = SAPP_HTML5_FETCH_ERROR_BUFFER_TOO_SMALL;
         }
         if (SAPP_HTML5_FETCH_ERROR_NO_ERROR != error_code) {
@@ -12193,15 +11558,15 @@ SOKOL_API_IMPL void sapp_html5_fetch_dropped_file(const sapp_html5_fetch_request
                 (int)error_code,
                 request->callback,
                 0, // fetched_size
-                (void*)request->buffer.ptr,
-                request->buffer.size,
+                request->buffer_ptr,
+                request->buffer_size,
                 request->user_data);
         }
         else {
             sapp_js_fetch_dropped_file(index,
                 request->callback,
-                (void*)request->buffer.ptr,
-                request->buffer.size,
+                request->buffer_ptr,
+                request->buffer_size,
                 request->user_data);
         }
     #else
@@ -12380,8 +11745,7 @@ SOKOL_API_IMPL const void* sapp_wgpu_get_depth_stencil_view(void) {
 }
 
 SOKOL_API_IMPL const void* sapp_android_get_native_activity(void) {
-    // NOTE: _sapp.valid is not asserted here because sapp_android_get_native_activity()
-    // needs to be callable from within sokol_main() (see: https://github.com/floooh/sokol/issues/708)
+    SOKOL_ASSERT(_sapp.valid);
     #if defined(_SAPP_ANDROID)
         return (void*)_sapp.android.activity;
     #else
@@ -12436,6 +11800,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     Optionally provide the following defines with your own implementations:
 
     SOKOL_ASSERT(c)             - your own assert macro (default: assert(c))
+    SOKOL_LOG(msg)              - your own logging function (default: puts(msg))
     SOKOL_UNREACHABLE()         - a guard macro for unreachable code (default: assert(false))
     SOKOL_GFX_API_DECL          - public function declaration prefix (default: extern)
     SOKOL_API_DECL              - same as SOKOL_GFX_API_DECL
@@ -12476,7 +11841,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
       source-code or shader-bytecode must be provided (for the "official"
       offline shader cross-compiler, see here:
       https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md)
-
 
     STEP BY STEP
     ============
@@ -12524,7 +11888,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     --- optionally update shader uniform data with:
 
             sg_apply_uniforms(sg_shader_stage stage, int ub_index, const sg_range* data)
-
+            
         Read the section 'UNIFORM DATA LAYOUT' to learn about the expected memory layout
         of the uniform data passed into sg_apply_uniforms().
 
@@ -12643,11 +12007,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
 
             bool sg_query_buffer_overflow(sg_buffer buf)
 
-        You can manually check to see if an overflow would occur before adding
-        any data to a buffer by calling
-
-            bool sg_query_buffer_will_overflow(sg_buffer buf, size_t size)
-
         NOTE: Due to restrictions in underlying 3D-APIs, appended chunks of
         data will be 4-byte aligned in the destination buffer. This means
         that there will be gaps in index buffers containing 16-bit indices
@@ -12703,7 +12062,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
         will be replaced with their concrete values in the returned desc
         struct.
 
-
     ON INITIALIZATION:
     ==================
     When calling sg_setup(), a pointer to an sg_desc struct must be provided
@@ -12738,7 +12096,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
             with context information provided by sokol_app.h
 
     See the documention block of the sg_desc struct below for more information.
-
+    
 
     UNIFORM DATA LAYOUT:
     ====================
@@ -12770,7 +12128,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
           SG_UNIFORMLAYOUT_STD140)
         - a list of the uniform block members types in the correct order they
           appear on the CPU side
-
+        
     For example if the GLSL shader has the following uniform declarations:
 
         uniform mat4 mvp;
@@ -12814,7 +12172,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     CROSS-BACKEND COMMON UNIFORM DATA LAYOUT
     ========================================
     For cross-platform / cross-3D-backend code it is important that the same uniform block
-    layout on the CPU side can be used for all sokol-gfx backends. To achieve this,
+    layout on the CPU side can be used for all sokol-gfx backends. To achieve this, 
     a common subset of the std140 layout must be used:
 
     - The uniform block layout hint in sg_shader_desc must be explicitely set to
@@ -12840,7 +12198,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
         - ivec4 => 16
         - mat4  => 16
     - Arrays are only allowed for the following types: vec4, int4, mat4.
-
+          
     Note that the HLSL cbuffer layout rules are slightly different from the
     std140 layout rules, this means that the cbuffer declarations in HLSL code
     must be tweaked so that the layout is compatible with std140.
@@ -12854,7 +12212,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     --- The GL backends need to know about the internal structure of uniform
         blocks, and the texture sampler-name and -type. The uniform layout details
         are  described in the UNIFORM DATA LAYOUT section above.
-
+        
             // uniform block structure and texture image definition in sg_shader_desc:
             sg_shader_desc desc = {
                 // uniform block description (size and internal structure)
@@ -12936,7 +12294,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
                 }
             };
 
-
     WORKING WITH CONTEXTS
     =====================
     sokol-gfx allows to switch between different rendering contexts and
@@ -12980,7 +12337,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
 
     https://github.com/floooh/sokol-samples/blob/master/glfw/multiwindow-glfw.c
 
-
     TRACE HOOKS:
     ============
     sokol_gfx.h optionally allows to install "trace hook" callbacks for
@@ -13009,7 +12365,6 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     As an example of how trace hooks are used, have a look at the
     imgui/sokol_gfx_imgui.h header which implements a realtime
     debugging UI for sokol_gfx.h on top of Dear ImGui.
-
 
     A NOTE ON PORTABLE PACKED VERTEX FORMATS:
     =========================================
@@ -13079,7 +12434,7 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
                 .allocator = {
                     .alloc = my_alloc,
                     .free = my_free,
-                    .user_data = ...,
+                    .user_data = ...;
                 }
             });
         ...
@@ -13090,231 +12445,10 @@ SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     itself though, not any allocations in OS libraries.
 
 
-    LOG FUNCTION OVERRIDE
-    =====================
-    You can override the log function at initialization time like this:
+    TODO:
+    ====
+    - talk about asynchronous resource creation
 
-        void my_log(const char* message, void* user_data) {
-            printf("sg says: \s\n", message);
-        }
-
-        ...
-            sg_setup(&(sg_desc){
-                // ...
-                .logger = {
-                    .log_cb = my_log,
-                    .user_data = ...,
-                }
-            });
-        ...
-
-    If no overrides are provided, puts will be used on most platforms.
-    On Android, __android_log_write will be used instead.
-
-
-    COMMIT LISTENERS
-    ================
-    It's possible to hook callback functions into sokol-gfx which are called from
-    inside sg_commit() in unspecified order. This is mainly useful for libraries
-    that build on top of sokol_gfx.h to be notified about the end/start of a frame.
-
-    To add a commit listener, call:
-
-        static void my_commit_listener(void* user_data) {
-            ...
-        }
-
-        bool success = sg_add_commit_listener((sg_commit_listener){
-            .func = my_commit_listener,
-            .user_data = ...,
-        });
-
-    The function returns false if the internal array of commit listeners is full,
-    or the same commit listener had already been added.
-
-    If the function returns true, my_commit_listener() will be called each frame
-    from inside sg_commit().
-
-    By default, 1024 distinct commit listeners can be added, but this number
-    can be tweaked in the sg_setup() call:
-
-        sg_setup(&(sg_desc){
-            .max_commit_listeners = 2048,
-        });
-
-    An sg_commit_listener item is equal to another if both the function
-    pointer and user_data field are equal.
-
-    To remove a commit listener:
-
-        bool success = sg_remove_commit_listener((sg_commit_listener){
-            .func = my_commit_listener,
-            .user_data = ...,
-        });
-
-    ...where the .func and .user_data field are equal to a previous
-    sg_add_commit_listener() call. The function returns true if the commit
-    listener item was found and removed, and false otherwise.
-
-
-    RESOURCE CREATION AND DESTRUCTION IN DETAIL
-    ===========================================
-    The 'vanilla' way to create resource objects is with the 'make functions':
-
-        sg_buffer sg_make_buffer(const sg_buffer_desc* desc)
-        sg_image sg_make_image(const sg_image_desc* desc)
-        sg_shader sg_make_shader(const sg_shader_desc* desc)
-        sg_pipeline sg_make_pipeline(const sg_pipeline_desc* desc)
-        sg_pass sg_make_pass(const sg_pass_desc* desc)
-
-    This will result in one of three cases:
-
-        1. The returned handle is invalid. This happens when there are no more
-           free slots in the resource pool for this resource type. An invalid
-           handle is associated with the INVALID resource state, for instance:
-
-                sg_buffer buf = sg_make_buffer(...)
-                if (sg_query_buffer_state(buf) == SG_RESOURCESTATE_INVALID) {
-                    // buffer pool is exhausted
-                }
-
-        2. The returned handle is valid, but creating the underlying resource
-           has failed for some reason. This results in a resource object in the
-           FAILED state. The reason *why* resource creation has failed differ
-           by resource type. Look for log messages with more details. A failed
-           resource state can be checked with:
-
-                sg_buffer buf = sg_make_buffer(...)
-                if (sg_query_buffer_state(buf) == SG_RESOURCESTATE_FAILED) {
-                    // creating the resource has failed
-                }
-
-        3. And finally, if everything goes right, the returned resource is
-           in resource state VALID and ready to use. This can be checked
-           with:
-
-                sg_buffer buf = sg_make_buffer(...)
-                if (sg_query_buffer_state(buf) == SG_RESOURCESTATE_VALID) {
-                    // creating the resource has failed
-                }
-
-    When calling the 'make functions', the created resource goes through a number
-    of states:
-
-        - INITIAL: the resource slot associated with the new resource is currently
-          free (technically, there is no resource yet, just an empty pool slot)
-        - ALLOC: a handle for the new resource has been allocated, this just means
-          a pool slot has been reserved.
-        - VALID or FAILED: in VALID state any 3D API backend resource objects have
-          been successfully created, otherwise if anything went wrong, the resource
-          will be in FAILED state.
-
-    Sometimes it makes sense to first grab a handle, but initialize the
-    underlying resource at a later time. For instance when loading data
-    asynchronously from a slow data source, you may know what buffers and
-    textures are needed at an early stage of the loading process, but actually
-    loading the buffer or texture content can only be completed at a later time.
-
-    For such situations, sokol-gfx resource objects can be created in two steps.
-    You can allocate a handle upfront with one of the 'alloc functions':
-
-        sg_buffer sg_alloc_buffer(void)
-        sg_image sg_alloc_image(void)
-        sg_shader sg_alloc_shader(void)
-        sg_pipeline sg_alloc_pipeline(void)
-        sg_pass sg_alloc_pass(void)
-
-    This will return a handle with the underlying resource object in the
-    ALLOC state:
-
-        sg_image img = sg_alloc_image();
-        if (sg_query_image_state(img) == SG_RESOURCESTATE_ALLOC) {
-            // allocating an image handle has succeeded, otherwise
-            // the image pool is full
-        }
-
-    Such an 'incomplete' handle can be used in most sokol-gfx rendering functions
-    without doing any harm, sokol-gfx will simply skip any rendering operation
-    that involve resources which are not in VALID state.
-
-    At a later time (for instance once the texture has completed loading
-    asynchronously), the resource creation can be completed by calling one of
-    the 'init functions', those functions take an existing resource handle and
-    'desc struct':
-
-        void sg_init_buffer(sg_buffer buf, const sg_buffer_desc* desc)
-        void sg_init_image(sg_image img, const sg_image_desc* desc)
-        void sg_init_shader(sg_shader shd, const sg_shader_desc* desc)
-        void sg_init_pipeline(sg_pipeline pip, const sg_pipeline_desc* desc)
-        void sg_init_pass(sg_pass pass, const sg_pass_desc* desc)
-
-    The init functions expect a resource in ALLOC state, and after the function
-    returns, the resource will be either in VALID or FAILED state. Calling
-    an 'alloc function' followed by the matching 'init function' is fully
-    equivalent with calling the 'make function' alone.
-
-    Destruction can also happen as a two-step process. The 'uninit functions'
-    will put a resource object from the VALID or FAILED state back into the
-    ALLOC state:
-
-        void sg_uninit_buffer(sg_buffer buf)
-        void sg_uninit_image(sg_image img)
-        void sg_uninit_shader(sg_shader shd)
-        void sg_uninit_pipeline(sg_pipeline pip)
-        void sg_uninit_pass(sg_pass pass)
-
-    Calling the 'uninit functions' with a resource that is not in the VALID or
-    FAILED state is a no-op.
-
-    To finally free the pool slot for recycling call the 'dealloc functions':
-
-        void sg_dealloc_buffer(sg_buffer buf)
-        void sg_dealloc_image(sg_image img)
-        void sg_dealloc_shader(sg_shader shd)
-        void sg_dealloc_pipeline(sg_pipeline pip)
-        void sg_dealloc_pass(sg_pass pass)
-
-    Calling the 'dealloc functions' on a resource that's not in ALLOC state is
-    a no-op, but will generate a warning log message.
-
-    Calling an 'uninit function' and 'dealloc function' in sequence is equivalent
-    with calling the associated 'destroy function':
-
-        void sg_destroy_buffer(sg_buffer buf)
-        void sg_destroy_image(sg_image img)
-        void sg_destroy_shader(sg_shader shd)
-        void sg_destroy_pipeline(sg_pipeline pip)
-        void sg_destroy_pass(sg_pass pass)
-
-    The 'destroy functions' can be called on resources in any state and generally
-    do the right thing (for instance if the resource is in ALLOC state, the destroy
-    function will be equivalent to the 'dealloc function' and skip the 'uninit part').
-
-    And finally to close the circle, the 'fail functions' can be called to manually
-    put a resource in ALLOC state into the FAILED state:
-
-        sg_fail_buffer(sg_buffer buf)
-        sg_fail_image(sg_image img)
-        sg_fail_shader(sg_shader shd)
-        sg_fail_pipeline(sg_pipeline pip)
-        sg_fail_pass(sg_pass pass)
-
-    This is recommended if anything went wrong outside of sokol-gfx during asynchronous
-    resource creation (for instance the file loading operation failed). In this case,
-    the 'fail function' should be called instead of the 'init function'.
-
-    Calling a 'fail function' on a resource that's not in ALLOC state is a no-op,
-    but will generate a warning log message.
-
-    NOTE: that two-step resource creation usually only makes sense for buffers
-    and images, but not for shaders, pipelines or passes. Most notably, trying
-    to create a pipeline object with a shader that's not in VALID state will
-    trigger a validation layer error, or if the validation layer is disabled,
-    result in a pipeline object in FAILED state. Same when trying to create
-    a pass object with image invalid image objects.
-
-    LICENSE
-    =======
     zlib/libpng license
 
     Copyright (c) 2018 Andre Weissflog
@@ -13579,8 +12713,6 @@ typedef enum sg_pixel_format {
     SG_PIXELFORMAT_ETC2_RGBA8,
     SG_PIXELFORMAT_ETC2_RG11,
     SG_PIXELFORMAT_ETC2_RG11SN,
-
-    SG_PIXELFORMAT_RGB9E5,
 
     _SG_PIXELFORMAT_NUM,
     _SG_PIXELFORMAT_FORCE_U32 = 0x7FFFFFFF
@@ -13978,35 +13110,35 @@ typedef enum sg_uniform_type {
 
 /*
     sg_uniform_layout
-
+    
     A hint for the interior memory layout of uniform blocks. This is
     only really relevant for the GL backend where the internal layout
     of uniform blocks must be known to sokol-gfx. For all other backends the
     internal memory layout of uniform blocks doesn't matter, sokol-gfx
     will just pass uniform data as a single memory blob to the
     3D backend.
-
+    
     SG_UNIFORMLAYOUT_NATIVE (default)
         Native layout means that a 'backend-native' memory layout
         is used. For the GL backend this means that uniforms
         are packed tightly in memory (e.g. there are no padding
         bytes).
-
+        
     SG_UNIFORMLAYOUT_STD140
         The memory layout is a subset of std140. Arrays are only
         allowed for the FLOAT4, INT4 and MAT4. Alignment is as
         is as follows:
-
+        
             FLOAT, INT:         4 byte alignment
             FLOAT2, INT2:       8 byte alignment
             FLOAT3, INT3:       16 byte alignment(!)
             FLOAT4, INT4:       16 byte alignment
             MAT4:               16 byte alignment
             FLOAT4[], INT4[]:   16 byte alignment
-
+            
         The overall size of the uniform block must be a multiple
         of 16.
-
+        
     For more information search for 'UNIFORM DATA LAYOUT' in the documentation block
     at the start of the header.
 */
@@ -14017,7 +13149,7 @@ typedef enum sg_uniform_layout {
     _SG_UNIFORMLAYOUT_NUM,
     _SG_UNIFORMLAYOUT_FORCE_U32 = 0x7FFFFFFF
 } sg_uniform_layout;
-
+ 
 /*
     sg_cull_mode
 
@@ -14622,9 +13754,9 @@ typedef struct sg_shader_desc {
         .enabled:           false
         .front/back:
             .compare:       SG_COMPAREFUNC_ALWAYS
-            .fail_op:       SG_STENCILOP_KEEP
             .depth_fail_op: SG_STENCILOP_KEEP
             .pass_op:       SG_STENCILOP_KEEP
+            .compare:       SG_COMPAREFUNC_ALWAYS
         .read_mask:         0
         .write_mask:        0
         .ref:               0
@@ -14923,11 +14055,9 @@ typedef struct sg_pass_info {
     .pipeline_pool_size     64
     .pass_pool_size         16
     .context_pool_size      16
+    .sampler_cache_size     64
     .uniform_buffer_size    4 MB (4*1024*1024)
     .staging_buffer_size    8 MB (8*1024*1024)
-    .sampler_cache_size     64
-    .max_commit_listeners   1024
-    .disable_validation     false
 
     .allocator.alloc        0 (in this case, malloc() will be called)
     .allocator.free         0 (in this case, free() will be called)
@@ -15064,20 +14194,6 @@ typedef struct sg_context_desc {
 } sg_context_desc;
 
 /*
-    sg_commit_listener
-
-    Used with function sg_add_commit_listener() to add a callback
-    which will be called in sg_commit(). This is useful for libraries
-    building on top of sokol-gfx to be notified about when a frame
-    ends (instead of having to guess, or add a manual 'new-frame'
-    function.
-*/
-typedef struct sg_commit_listener {
-    void (*func)(void* user_data);
-    void* user_data;
-} sg_commit_listener;
-
-/*
     sg_allocator
 
     Used in sg_desc to provide custom memory-alloc and -free functions
@@ -15085,22 +14201,14 @@ typedef struct sg_commit_listener {
     alloc and free function must be provided (e.g. it's not valid to
     override one function but not the other).
 */
+typedef void*(*sg_malloc)(size_t size, void* user_data);
+typedef void(*sg_free)(void* ptr, void* user_data);
+
 typedef struct sg_allocator {
-    void* (*alloc)(size_t size, void* user_data);
-    void (*free)(void* ptr, void* user_data);
+    sg_malloc alloc;
+    sg_free free;
     void* user_data;
 } sg_allocator;
-
-/*
-    sg_logger
-
-    Used in sg_desc to provide custom log callbacks to sokol_gfx.h.
-    Default behavior is SOKOL_LOG(message).
-*/
-typedef struct sg_logger {
-    void (*log_cb)(const char* message, void* user_data);
-    void* user_data;
-} sg_logger;
 
 typedef struct sg_desc {
     uint32_t _start_canary;
@@ -15113,10 +14221,7 @@ typedef struct sg_desc {
     int uniform_buffer_size;
     int staging_buffer_size;
     int sampler_cache_size;
-    int max_commit_listeners;
-    bool disable_validation;    // disable validation layer even in debug mode, useful for tests
     sg_allocator allocator;
-    sg_logger logger; // optional log function override
     sg_context_desc context;
     uint32_t _end_canary;
 } sg_desc;
@@ -15129,8 +14234,6 @@ SOKOL_GFX_API_DECL void sg_reset_state_cache(void);
 SOKOL_GFX_API_DECL sg_trace_hooks sg_install_trace_hooks(const sg_trace_hooks* trace_hooks);
 SOKOL_GFX_API_DECL void sg_push_debug_group(const char* name);
 SOKOL_GFX_API_DECL void sg_pop_debug_group(void);
-SOKOL_GFX_API_DECL bool sg_add_commit_listener(sg_commit_listener listener);
-SOKOL_GFX_API_DECL bool sg_remove_commit_listener(sg_commit_listener listener);
 
 /* resource creation, destruction and updating */
 SOKOL_GFX_API_DECL sg_buffer sg_make_buffer(const sg_buffer_desc* desc);
@@ -15147,7 +14250,6 @@ SOKOL_GFX_API_DECL void sg_update_buffer(sg_buffer buf, const sg_range* data);
 SOKOL_GFX_API_DECL void sg_update_image(sg_image img, const sg_image_data* data);
 SOKOL_GFX_API_DECL int sg_append_buffer(sg_buffer buf, const sg_range* data);
 SOKOL_GFX_API_DECL bool sg_query_buffer_overflow(sg_buffer buf);
-SOKOL_GFX_API_DECL bool sg_query_buffer_will_overflow(sg_buffer buf, size_t size);
 
 /* rendering functions */
 SOKOL_GFX_API_DECL void sg_begin_default_pass(const sg_pass_action* pass_action, int width, int height);
@@ -15195,26 +14297,26 @@ SOKOL_GFX_API_DECL sg_image sg_alloc_image(void);
 SOKOL_GFX_API_DECL sg_shader sg_alloc_shader(void);
 SOKOL_GFX_API_DECL sg_pipeline sg_alloc_pipeline(void);
 SOKOL_GFX_API_DECL sg_pass sg_alloc_pass(void);
-SOKOL_GFX_API_DECL void sg_dealloc_buffer(sg_buffer buf);
-SOKOL_GFX_API_DECL void sg_dealloc_image(sg_image img);
-SOKOL_GFX_API_DECL void sg_dealloc_shader(sg_shader shd);
-SOKOL_GFX_API_DECL void sg_dealloc_pipeline(sg_pipeline pip);
-SOKOL_GFX_API_DECL void sg_dealloc_pass(sg_pass pass);
-SOKOL_GFX_API_DECL void sg_init_buffer(sg_buffer buf, const sg_buffer_desc* desc);
-SOKOL_GFX_API_DECL void sg_init_image(sg_image img, const sg_image_desc* desc);
-SOKOL_GFX_API_DECL void sg_init_shader(sg_shader shd, const sg_shader_desc* desc);
-SOKOL_GFX_API_DECL void sg_init_pipeline(sg_pipeline pip, const sg_pipeline_desc* desc);
-SOKOL_GFX_API_DECL void sg_init_pass(sg_pass pass, const sg_pass_desc* desc);
-SOKOL_GFX_API_DECL void sg_uninit_buffer(sg_buffer buf);
-SOKOL_GFX_API_DECL void sg_uninit_image(sg_image img);
-SOKOL_GFX_API_DECL void sg_uninit_shader(sg_shader shd);
-SOKOL_GFX_API_DECL void sg_uninit_pipeline(sg_pipeline pip);
-SOKOL_GFX_API_DECL void sg_uninit_pass(sg_pass pass);
-SOKOL_GFX_API_DECL void sg_fail_buffer(sg_buffer buf);
-SOKOL_GFX_API_DECL void sg_fail_image(sg_image img);
-SOKOL_GFX_API_DECL void sg_fail_shader(sg_shader shd);
-SOKOL_GFX_API_DECL void sg_fail_pipeline(sg_pipeline pip);
-SOKOL_GFX_API_DECL void sg_fail_pass(sg_pass pass);
+SOKOL_GFX_API_DECL void sg_dealloc_buffer(sg_buffer buf_id);
+SOKOL_GFX_API_DECL void sg_dealloc_image(sg_image img_id);
+SOKOL_GFX_API_DECL void sg_dealloc_shader(sg_shader shd_id);
+SOKOL_GFX_API_DECL void sg_dealloc_pipeline(sg_pipeline pip_id);
+SOKOL_GFX_API_DECL void sg_dealloc_pass(sg_pass pass_id);
+SOKOL_GFX_API_DECL void sg_init_buffer(sg_buffer buf_id, const sg_buffer_desc* desc);
+SOKOL_GFX_API_DECL void sg_init_image(sg_image img_id, const sg_image_desc* desc);
+SOKOL_GFX_API_DECL void sg_init_shader(sg_shader shd_id, const sg_shader_desc* desc);
+SOKOL_GFX_API_DECL void sg_init_pipeline(sg_pipeline pip_id, const sg_pipeline_desc* desc);
+SOKOL_GFX_API_DECL void sg_init_pass(sg_pass pass_id, const sg_pass_desc* desc);
+SOKOL_GFX_API_DECL bool sg_uninit_buffer(sg_buffer buf_id);
+SOKOL_GFX_API_DECL bool sg_uninit_image(sg_image img_id);
+SOKOL_GFX_API_DECL bool sg_uninit_shader(sg_shader shd_id);
+SOKOL_GFX_API_DECL bool sg_uninit_pipeline(sg_pipeline pip_id);
+SOKOL_GFX_API_DECL bool sg_uninit_pass(sg_pass pass_id);
+SOKOL_GFX_API_DECL void sg_fail_buffer(sg_buffer buf_id);
+SOKOL_GFX_API_DECL void sg_fail_image(sg_image img_id);
+SOKOL_GFX_API_DECL void sg_fail_shader(sg_shader shd_id);
+SOKOL_GFX_API_DECL void sg_fail_pipeline(sg_pipeline pip_id);
+SOKOL_GFX_API_DECL void sg_fail_pass(sg_pass pass_id);
 
 /* rendering contexts (optional) */
 SOKOL_GFX_API_DECL sg_context sg_setup_context(void);
@@ -15292,7 +14394,7 @@ inline int sg_append_buffer(sg_buffer buf_id, const sg_range& data) { return sg_
 #endif
 #ifndef SOKOL_DEBUG
     #ifndef NDEBUG
-        #define SOKOL_DEBUG
+        #define SOKOL_DEBUG (1)
     #endif
 #endif
 #ifndef SOKOL_ASSERT
@@ -15311,19 +14413,12 @@ inline int sg_append_buffer(sg_buffer buf_id, const sg_range& data) { return sg_
 #ifndef SOKOL_UNREACHABLE
     #define SOKOL_UNREACHABLE SOKOL_ASSERT(false)
 #endif
-
-#if !defined(SOKOL_DEBUG)
-    #define SG_LOG(s)
-#else
-    #define SG_LOG(s) _sg_log(s)
-    #ifndef SOKOL_LOG
-        #if defined(__ANDROID__)
-            #include <android/log.h>
-            #define SOKOL_LOG(s) __android_log_write(ANDROID_LOG_INFO, "SOKOL_GFX", s)
-        #else
-            #include <stdio.h>
-            #define SOKOL_LOG(s) puts(s)
-        #endif
+#ifndef SOKOL_LOG
+    #ifdef SOKOL_DEBUG
+        #include <stdio.h>
+        #define SOKOL_LOG(s) { SOKOL_ASSERT(s); puts(s); }
+    #else
+        #define SOKOL_LOG(s)
     #endif
 #endif
 
@@ -15644,8 +14739,6 @@ inline int sg_append_buffer(sg_buffer buf_id, const sg_range& data) { return sg_
         #define GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS 0x8B4D
         #define GL_R11F_G11F_B10F 0x8C3A
         #define GL_UNSIGNED_INT_10F_11F_11F_REV 0x8C3B
-        #define GL_RGB9_E5 0x8C3D
-        #define GL_UNSIGNED_INT_5_9_9_9_REV 0x8C3E
         #define GL_RGBA32UI 0x8D70
         #define GL_RGB32UI 0x8D71
         #define GL_RGBA16UI 0x8D76
@@ -15834,7 +14927,6 @@ enum {
     _SG_DEFAULT_SAMPLER_CACHE_CAPACITY = 64,
     _SG_DEFAULT_UB_SIZE = 4 * 1024 * 1024,
     _SG_DEFAULT_STAGING_SIZE = 8 * 1024 * 1024,
-    _SG_DEFAULT_MAX_COMMIT_LISTENERS = 1024,
 };
 
 /* fixed-size string */
@@ -16906,12 +15998,6 @@ typedef enum {
 /*=== GENERIC BACKEND STATE ==================================================*/
 
 typedef struct {
-    int num;        // number of allocated commit listener items
-    int upper;      // the current upper index (no valid items past this point)
-    sg_commit_listener* items;
-} _sg_commit_listeners_t;
-
-typedef struct {
     bool valid;
     sg_desc desc;       /* original desc with default values patched in */
     uint32_t frame_index;
@@ -16941,7 +16027,6 @@ typedef struct {
     #if defined(SOKOL_TRACE_HOOKS)
     sg_trace_hooks hooks;
     #endif
-    _sg_commit_listeners_t commit_listeners;
 } _sg_state_t;
 static _sg_state_t _sg;
 
@@ -16950,7 +16035,7 @@ static _sg_state_t _sg;
 // a helper macro to clear a struct with potentially ARC'ed ObjC references
 #if defined(SOKOL_METAL)
     #if defined(__cplusplus)
-        #define _SG_CLEAR_ARC_STRUCT(type, item) { item = type(); }
+        #define _SG_CLEAR_ARC_STRUCT(type, item) { item = { }; }
     #else
         #define _SG_CLEAR_ARC_STRUCT(type, item) { item = (type) { 0 }; }
     #endif
@@ -16990,17 +16075,6 @@ _SOKOL_PRIVATE void _sg_free(void* ptr) {
         free(ptr);
     }
 }
-
-#if defined(SOKOL_DEBUG)
-_SOKOL_PRIVATE void _sg_log(const char* msg) {
-    SOKOL_ASSERT(msg);
-    if (_sg.desc.logger.log_cb) {
-        _sg.desc.logger.log_cb(msg, _sg.desc.logger.user_data);
-    } else {
-        SOKOL_LOG(msg);
-    }
-}
-#endif
 
 _SOKOL_PRIVATE bool _sg_strempty(const _sg_str_t* str) {
     return 0 == str->buf[0];
@@ -17235,7 +16309,6 @@ _SOKOL_PRIVATE int _sg_pixelformat_bytesize(sg_pixel_format fmt) {
         case SG_PIXELFORMAT_BGRA8:
         case SG_PIXELFORMAT_RGB10A2:
         case SG_PIXELFORMAT_RG11B10F:
-        case SG_PIXELFORMAT_RGB9E5:
             return 4;
 
         case SG_PIXELFORMAT_RG32UI:
@@ -17488,7 +16561,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_context(_sg_context_t* ctx) {
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_context(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     _SOKOL_UNUSED(ctx);
 }
@@ -17504,7 +16577,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_buffer(_sg_buffer_t* buf, cons
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_buffer(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     _SOKOL_UNUSED(buf);
 }
@@ -17515,7 +16588,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_image(_sg_image_t* img, const 
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_image(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     _SOKOL_UNUSED(img);
 }
@@ -17526,7 +16599,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_shader(_sg_shader_t* shd, cons
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_shader(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     _SOKOL_UNUSED(shd);
 }
@@ -17546,7 +16619,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_pipeline(_sg_pipeline_t* pip, 
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_pipeline(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     _SOKOL_UNUSED(pip);
 }
@@ -17578,7 +16651,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_dummy_create_pass(_sg_pass_t* pass, _sg_ima
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_dummy_discard_pass(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_dummy_destroy_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     _SOKOL_UNUSED(pass);
 }
@@ -18098,8 +17171,6 @@ _SOKOL_PRIVATE GLenum _sg_gl_teximage_type(sg_pixel_format fmt) {
             return GL_UNSIGNED_INT_2_10_10_10_REV;
         case SG_PIXELFORMAT_RG11B10F:
             return GL_UNSIGNED_INT_10F_11F_11F_REV;
-        case SG_PIXELFORMAT_RGB9E5:
-            return GL_UNSIGNED_INT_5_9_9_9_REV;
         #endif
         case SG_PIXELFORMAT_DEPTH:
             return GL_UNSIGNED_SHORT;
@@ -18169,7 +17240,6 @@ _SOKOL_PRIVATE GLenum _sg_gl_teximage_format(sg_pixel_format fmt) {
                 return GL_RGBA_INTEGER;
         #endif
         case SG_PIXELFORMAT_RG11B10F:
-        case SG_PIXELFORMAT_RGB9E5:
             return GL_RGB;
         case SG_PIXELFORMAT_DEPTH:
             return GL_DEPTH_COMPONENT;
@@ -18258,7 +17328,6 @@ _SOKOL_PRIVATE GLenum _sg_gl_teximage_internal_format(sg_pixel_format fmt) {
             case SG_PIXELFORMAT_RGBA8SI:    return GL_RGBA8I;
             case SG_PIXELFORMAT_RGB10A2:    return GL_RGB10_A2;
             case SG_PIXELFORMAT_RG11B10F:   return GL_R11F_G11F_B10F;
-            case SG_PIXELFORMAT_RGB9E5:     return GL_RGB9_E5;
             case SG_PIXELFORMAT_RG32UI:     return GL_RG32UI;
             case SG_PIXELFORMAT_RG32SI:     return GL_RG32I;
             case SG_PIXELFORMAT_RG32F:      return GL_RG32F;
@@ -18371,7 +17440,6 @@ _SOKOL_PRIVATE void _sg_gl_init_pixelformats(bool has_bgra) {
     if (!_sg.gl.gles2) {
         _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_RGB10A2]);
         _sg_pixelformat_sf(&_sg.formats[SG_PIXELFORMAT_RG11B10F]);
-        _sg_pixelformat_sf(&_sg.formats[SG_PIXELFORMAT_RGB9E5]);
         _sg_pixelformat_srm(&_sg.formats[SG_PIXELFORMAT_RG32UI]);
         _sg_pixelformat_srm(&_sg.formats[SG_PIXELFORMAT_RG32SI]);
         #if !defined(SOKOL_GLES3)
@@ -18905,7 +17973,7 @@ _SOKOL_PRIVATE void _sg_gl_cache_restore_buffer_binding(GLenum target) {
     }
 }
 
-/* called when _sg_gl_deinit_buffer() */
+/* called when from _sg_gl_destroy_buffer() */
 _SOKOL_PRIVATE void _sg_gl_cache_invalidate_buffer(GLuint buf) {
     if (buf == _sg.gl.cache.vertex_buffer) {
         _sg.gl.cache.vertex_buffer = 0;
@@ -19014,7 +18082,7 @@ _SOKOL_PRIVATE void _sg_gl_cache_invalidate_texture(GLuint tex) {
     }
 }
 
-/* called from _sg_gl_discard_shader() */
+/* called from _sg_gl_destroy_shader() */
 _SOKOL_PRIVATE void _sg_gl_cache_invalidate_program(GLuint prog) {
     if (prog == _sg.gl.cache.prog) {
         _sg.gl.cache.prog = 0;
@@ -19022,7 +18090,7 @@ _SOKOL_PRIVATE void _sg_gl_cache_invalidate_program(GLuint prog) {
     }
 }
 
-/* called from _sg_gl_discard_pipeline() */
+/* called from _sg_gl_destroy_pipeline() */
 _SOKOL_PRIVATE void _sg_gl_cache_invalidate_pipeline(_sg_pipeline_t* pip) {
     if (pip == _sg.gl.cache.cur_pipeline) {
         _sg.gl.cache.cur_pipeline = 0;
@@ -19176,7 +18244,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_context(_sg_context_t* ctx) {
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_context(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_gl_destroy_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     #if !defined(SOKOL_GLES2)
     if (!_sg.gl.gles2) {
@@ -19221,7 +18289,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_buffer(_sg_buffer_t* buf, const s
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_buffer(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_gl_destroy_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     _SG_GL_CHECK_ERROR();
     for (int slot = 0; slot < buf->cmn.num_slots; slot++) {
@@ -19249,16 +18317,16 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_image(_sg_image_t* img, const sg_
 
     /* check if texture format is support */
     if (!_sg_gl_supported_texture_format(img->cmn.pixel_format)) {
-        SG_LOG("texture format not supported by GL context\n");
+        SOKOL_LOG("texture format not supported by GL context\n");
         return SG_RESOURCESTATE_FAILED;
     }
     /* check for optional texture types */
     if ((img->cmn.type == SG_IMAGETYPE_3D) && !_sg.features.imagetype_3d) {
-        SG_LOG("3D textures not supported by GL context\n");
+        SOKOL_LOG("3D textures not supported by GL context\n");
         return SG_RESOURCESTATE_FAILED;
     }
     if ((img->cmn.type == SG_IMAGETYPE_ARRAY) && !_sg.features.imagetype_array) {
-        SG_LOG("array textures not supported by GL context\n");
+        SOKOL_LOG("array textures not supported by GL context\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -19427,7 +18495,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_image(_sg_image_t* img, const sg_
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_image(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_gl_destroy_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     _SG_GL_CHECK_ERROR();
     for (int slot = 0; slot < img->cmn.num_slots; slot++) {
@@ -19462,7 +18530,7 @@ _SOKOL_PRIVATE GLuint _sg_gl_compile_shader(sg_shader_stage stage, const char* s
         if (log_len > 0) {
             GLchar* log_buf = (GLchar*) _sg_malloc((size_t)log_len);
             glGetShaderInfoLog(gl_shd, log_len, &log_len, log_buf);
-            SG_LOG(log_buf);
+            SOKOL_LOG(log_buf);
             _sg_free(log_buf);
         }
         glDeleteShader(gl_shd);
@@ -19505,7 +18573,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_shader(_sg_shader_t* shd, const s
         if (log_len > 0) {
             GLchar* log_buf = (GLchar*) _sg_malloc((size_t)log_len);
             glGetProgramInfoLog(gl_prog, log_len, &log_len, log_buf);
-            SG_LOG(log_buf);
+            SOKOL_LOG(log_buf);
             _sg_free(log_buf);
         }
         glDeleteProgram(gl_prog);
@@ -19585,7 +18653,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_shader(_sg_shader_t* shd, const s
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_shader(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_gl_destroy_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     _SG_GL_CHECK_ERROR();
     if (shd->gl.prog) {
@@ -19653,14 +18721,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_pipeline(_sg_pipeline_t* pip, _sg
             pip->cmn.vertex_layout_valid[a_desc->buffer_index] = true;
         }
         else {
-            SG_LOG("Vertex attribute not found in shader: ");
-            SG_LOG(_sg_strptr(&shd->gl.attrs[attr_index].name));
+            SOKOL_LOG("Vertex attribute not found in shader: ");
+            SOKOL_LOG(_sg_strptr(&shd->gl.attrs[attr_index].name));
         }
     }
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_pipeline(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_gl_destroy_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     _sg_gl_cache_invalidate_pipeline(pip);
 }
@@ -19759,7 +18827,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_pass(_sg_pass_t* pass, _sg_image_
 
     /* check if framebuffer is complete */
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        SG_LOG("Framebuffer completeness check failed!\n");
+        SOKOL_LOG("Framebuffer completeness check failed!\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -19806,7 +18874,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_pass(_sg_pass_t* pass, _sg_image_
                 }
                 /* check if framebuffer is complete */
                 if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                    SG_LOG("Framebuffer completeness check failed (msaa resolve buffer)!\n");
+                    SOKOL_LOG("Framebuffer completeness check failed (msaa resolve buffer)!\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
                 /* setup color attachments for the framebuffer */
@@ -19826,7 +18894,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_gl_create_pass(_sg_pass_t* pass, _sg_image_
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_gl_discard_pass(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_gl_destroy_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     SOKOL_ASSERT(pass != _sg.gl.cur_pass);
     _SG_GL_CHECK_ERROR();
@@ -20983,7 +20051,6 @@ _SOKOL_PRIVATE DXGI_FORMAT _sg_d3d11_pixel_format(sg_pixel_format fmt) {
         case SG_PIXELFORMAT_BGRA8:          return DXGI_FORMAT_B8G8R8A8_UNORM;
         case SG_PIXELFORMAT_RGB10A2:        return DXGI_FORMAT_R10G10B10A2_UNORM;
         case SG_PIXELFORMAT_RG11B10F:       return DXGI_FORMAT_R11G11B10_FLOAT;
-        case SG_PIXELFORMAT_RGB9E5:         return DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
         case SG_PIXELFORMAT_RG32UI:         return DXGI_FORMAT_R32G32_UINT;
         case SG_PIXELFORMAT_RG32SI:         return DXGI_FORMAT_R32G32_SINT;
         case SG_PIXELFORMAT_RG32F:          return DXGI_FORMAT_R32G32_FLOAT;
@@ -21284,7 +20351,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_context(_sg_context_t* ctx) {
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_context(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     _SOKOL_UNUSED(ctx);
     /* empty */
@@ -21316,14 +20383,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_buffer(_sg_buffer_t* buf, cons
         }
         HRESULT hr = _sg_d3d11_CreateBuffer(_sg.d3d11.dev, &d3d11_desc, init_data_ptr, &buf->d3d11.buf);
         if (!(SUCCEEDED(hr) && buf->d3d11.buf)) {
-            SG_LOG("failed to create D3D11 buffer\n");
+            SOKOL_LOG("failed to create D3D11 buffer\n");
             return SG_RESOURCESTATE_FAILED;
         }
     }
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_buffer(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     if (buf->d3d11.buf) {
         _sg_d3d11_Release(buf->d3d11.buf);
@@ -21375,7 +20442,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
         /* create only a depth-texture */
         SOKOL_ASSERT(!injected);
         if (img->d3d11.format == DXGI_FORMAT_UNKNOWN) {
-            SG_LOG("trying to create a D3D11 depth-texture with unsupported pixel format\n");
+            SOKOL_LOG("trying to create a D3D11 depth-texture with unsupported pixel format\n");
             return SG_RESOURCESTATE_FAILED;
         }
         D3D11_TEXTURE2D_DESC d3d11_desc;
@@ -21391,7 +20458,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
         d3d11_desc.SampleDesc.Quality = (UINT) (msaa ? D3D11_STANDARD_MULTISAMPLE_PATTERN : 0);
         hr = _sg_d3d11_CreateTexture2D(_sg.d3d11.dev, &d3d11_desc, NULL, &img->d3d11.texds);
         if (!(SUCCEEDED(hr) && img->d3d11.texds)) {
-            SG_LOG("failed to create D3D11 texture 2D\n");
+            SOKOL_LOG("failed to create D3D11 texture 2D\n");
             return SG_RESOURCESTATE_FAILED;
         }
     }
@@ -21455,7 +20522,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
                 }
                 if (img->d3d11.format == DXGI_FORMAT_UNKNOWN) {
                     /* trying to create a texture format that's not supported by D3D */
-                    SG_LOG("trying to create a D3D11 texture with unsupported pixel format\n");
+                    SOKOL_LOG("trying to create a D3D11 texture with unsupported pixel format\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
                 d3d11_tex_desc.SampleDesc.Count = 1;
@@ -21464,7 +20531,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
 
                 hr = _sg_d3d11_CreateTexture2D(_sg.d3d11.dev, &d3d11_tex_desc, init_data, &img->d3d11.tex2d);
                 if (!(SUCCEEDED(hr) && img->d3d11.tex2d)) {
-                    SG_LOG("failed to create D3D11 texture 2D\n");
+                    SOKOL_LOG("failed to create D3D11 texture 2D\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
             }
@@ -21493,7 +20560,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
                 }
                 hr = _sg_d3d11_CreateShaderResourceView(_sg.d3d11.dev, (ID3D11Resource*)img->d3d11.tex2d, &d3d11_srv_desc, &img->d3d11.srv);
                 if (!(SUCCEEDED(hr) && img->d3d11.srv)) {
-                    SG_LOG("failed to create D3D11 resource view\n");
+                    SOKOL_LOG("failed to create D3D11 resource view\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
             }
@@ -21538,12 +20605,12 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
                 }
                 if (img->d3d11.format == DXGI_FORMAT_UNKNOWN) {
                     /* trying to create a texture format that's not supported by D3D */
-                    SG_LOG("trying to create a D3D11 texture with unsupported pixel format\n");
+                    SOKOL_LOG("trying to create a D3D11 texture with unsupported pixel format\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
                 hr = _sg_d3d11_CreateTexture3D(_sg.d3d11.dev, &d3d11_tex_desc, init_data, &img->d3d11.tex3d);
                 if (!(SUCCEEDED(hr) && img->d3d11.tex3d)) {
-                    SG_LOG("failed to create D3D11 texture 3D\n");
+                    SOKOL_LOG("failed to create D3D11 texture 3D\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
             }
@@ -21556,7 +20623,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
                 d3d11_srv_desc.Texture3D.MipLevels = (UINT)img->cmn.num_mipmaps;
                 hr = _sg_d3d11_CreateShaderResourceView(_sg.d3d11.dev, (ID3D11Resource*)img->d3d11.tex3d, &d3d11_srv_desc, &img->d3d11.srv);
                 if (!(SUCCEEDED(hr) && img->d3d11.srv)) {
-                    SG_LOG("failed to create D3D11 resource view\n");
+                    SOKOL_LOG("failed to create D3D11 resource view\n");
                     return SG_RESOURCESTATE_FAILED;
                 }
             }
@@ -21578,7 +20645,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
             d3d11_tex_desc.SampleDesc.Quality = (UINT)D3D11_STANDARD_MULTISAMPLE_PATTERN;
             hr = _sg_d3d11_CreateTexture2D(_sg.d3d11.dev, &d3d11_tex_desc, NULL, &img->d3d11.texmsaa);
             if (!(SUCCEEDED(hr) && img->d3d11.texmsaa)) {
-                SG_LOG("failed to create D3D11 texture 2D\n");
+                SOKOL_LOG("failed to create D3D11 texture 2D\n");
                 return SG_RESOURCESTATE_FAILED;
             }
         }
@@ -21610,14 +20677,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_image(_sg_image_t* img, const 
         d3d11_smp_desc.MaxLOD = desc->max_lod;
         hr = _sg_d3d11_CreateSamplerState(_sg.d3d11.dev, &d3d11_smp_desc, &img->d3d11.smp);
         if (!(SUCCEEDED(hr) && img->d3d11.smp)) {
-            SG_LOG("failed to create D3D11 sampler state\n");
+            SOKOL_LOG("failed to create D3D11 sampler state\n");
             return SG_RESOURCESTATE_FAILED;
         }
     }
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_image(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     if (img->d3d11.tex2d) {
         _sg_d3d11_Release(img->d3d11.tex2d);
@@ -21649,7 +20716,7 @@ _SOKOL_PRIVATE bool _sg_d3d11_load_d3dcompiler_dll(void) {
             _sg.d3d11.d3dcompiler_dll = LoadLibraryA("d3dcompiler_47.dll");
             if (0 == _sg.d3d11.d3dcompiler_dll) {
                 /* don't attempt to load missing DLL in the future */
-                SG_LOG("failed to load d3dcompiler_47.dll!\n");
+                SOKOL_LOG("failed to load d3dcompiler_47.dll!\n");
                 _sg.d3d11.d3dcompiler_dll_load_failed = true;
                 return false;
             }
@@ -21687,7 +20754,7 @@ _SOKOL_PRIVATE ID3DBlob* _sg_d3d11_compile_shader(const sg_shader_stage_desc* st
         &output,    /* ppCode */
         &errors_or_warnings);   /* ppErrorMsgs */
     if (errors_or_warnings) {
-        SG_LOG((LPCSTR)_sg_d3d11_GetBufferPointer(errors_or_warnings));
+        SOKOL_LOG((LPCSTR)_sg_d3d11_GetBufferPointer(errors_or_warnings));
         _sg_d3d11_Release(errors_or_warnings); errors_or_warnings = NULL;
     }
     if (FAILED(hr)) {
@@ -21729,7 +20796,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_shader(_sg_shader_t* shd, cons
             cb_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
             hr = _sg_d3d11_CreateBuffer(_sg.d3d11.dev, &cb_desc, NULL, &d3d11_stage->cbufs[ub_index]);
             if (!(SUCCEEDED(hr) && d3d11_stage->cbufs[ub_index])) {
-                SG_LOG("failed to create D3D11 buffer\n");
+                SOKOL_LOG("failed to create D3D11 buffer\n");
                 return SG_RESOURCESTATE_FAILED;
             }
         }
@@ -21782,7 +20849,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_shader(_sg_shader_t* shd, cons
     return result;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_shader(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     if (shd->d3d11.vs) {
         _sg_d3d11_Release(shd->d3d11.vs);
@@ -21861,7 +20928,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pipeline(_sg_pipeline_t* pip, 
         shd->d3d11.vs_blob_length,  /* BytecodeLength */
         &pip->d3d11.il);
     if (!(SUCCEEDED(hr) && pip->d3d11.il)) {
-        SG_LOG("failed to create D3D11 input layout\n");
+        SOKOL_LOG("failed to create D3D11 input layout\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -21880,7 +20947,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pipeline(_sg_pipeline_t* pip, 
     rs_desc.AntialiasedLineEnable = FALSE;
     hr = _sg_d3d11_CreateRasterizerState(_sg.d3d11.dev, &rs_desc, &pip->d3d11.rs);
     if (!(SUCCEEDED(hr) && pip->d3d11.rs)) {
-        SG_LOG("failed to create D3D11 rasterizer state\n");
+        SOKOL_LOG("failed to create D3D11 rasterizer state\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -21905,7 +20972,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pipeline(_sg_pipeline_t* pip, 
     dss_desc.BackFace.StencilFunc = _sg_d3d11_compare_func(sb->compare);
     hr = _sg_d3d11_CreateDepthStencilState(_sg.d3d11.dev, &dss_desc, &pip->d3d11.dss);
     if (!(SUCCEEDED(hr) && pip->d3d11.dss)) {
-        SG_LOG("failed to create D3D11 depth stencil state\n");
+        SOKOL_LOG("failed to create D3D11 depth stencil state\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -21939,14 +21006,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pipeline(_sg_pipeline_t* pip, 
     }
     hr = _sg_d3d11_CreateBlendState(_sg.d3d11.dev, &bs_desc, &pip->d3d11.bs);
     if (!(SUCCEEDED(hr) && pip->d3d11.bs)) {
-        SG_LOG("failed to create D3D11 blend state\n");
+        SOKOL_LOG("failed to create D3D11 blend state\n");
         return SG_RESOURCESTATE_FAILED;
     }
 
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_pipeline(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     if (pip == _sg.d3d11.cur_pipeline) {
         _sg.d3d11.cur_pipeline = 0;
@@ -22020,7 +21087,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pass(_sg_pass_t* pass, _sg_ima
         SOKOL_ASSERT(d3d11_res);
         HRESULT hr = _sg_d3d11_CreateRenderTargetView(_sg.d3d11.dev, d3d11_res, &d3d11_rtv_desc, &pass->d3d11.color_atts[i].rtv);
         if (!(SUCCEEDED(hr) && pass->d3d11.color_atts[i].rtv)) {
-            SG_LOG("failed to create D3D11 render target view\n");
+            SOKOL_LOG("failed to create D3D11 render target view\n");
             return SG_RESOURCESTATE_FAILED;
         }
     }
@@ -22053,14 +21120,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_d3d11_create_pass(_sg_pass_t* pass, _sg_ima
         SOKOL_ASSERT(d3d11_res);
         HRESULT hr = _sg_d3d11_CreateDepthStencilView(_sg.d3d11.dev, d3d11_res, &d3d11_dsv_desc, &pass->d3d11.ds_att.dsv);
         if (!(SUCCEEDED(hr) && pass->d3d11.ds_att.dsv)) {
-            SG_LOG("failed to create D3D11 depth stencil view\n");
+            SOKOL_LOG("failed to create D3D11 depth stencil view\n");
             return SG_RESOURCESTATE_FAILED;
         }
     }
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_d3d11_discard_pass(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_d3d11_destroy_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     SOKOL_ASSERT(pass != _sg.d3d11.cur_pass);
     for (int i = 0; i < SG_MAX_COLOR_ATTACHMENTS; i++) {
@@ -22353,7 +21420,7 @@ _SOKOL_PRIVATE void _sg_d3d11_update_buffer(_sg_buffer_t* buf, const sg_range* d
         memcpy(d3d11_msr.pData, data->ptr, data->size);
         _sg_d3d11_Unmap(_sg.d3d11.ctx, (ID3D11Resource*)buf->d3d11.buf, 0);
     } else {
-        SG_LOG("failed to map buffer while updating!\n");
+        SOKOL_LOG("failed to map buffer while updating!\n");
     }
 }
 
@@ -22369,7 +21436,7 @@ _SOKOL_PRIVATE int _sg_d3d11_append_buffer(_sg_buffer_t* buf, const sg_range* da
         memcpy(dst_ptr, data->ptr, data->size);
         _sg_d3d11_Unmap(_sg.d3d11.ctx, (ID3D11Resource*)buf->d3d11.buf, 0);
     } else {
-        SG_LOG("failed to map buffer while appending!\n");
+        SOKOL_LOG("failed to map buffer while appending!\n");
     }
     /* NOTE: this alignment is a requirement from WebGPU, but we want identical behaviour across all backend */
     return _sg_roundup((int)data->size, 4);
@@ -22421,7 +21488,7 @@ _SOKOL_PRIVATE void _sg_d3d11_update_image(_sg_image_t* img, const sg_image_data
                     }
                     _sg_d3d11_Unmap(_sg.d3d11.ctx, d3d11_res, subres_index);
                 } else {
-                    SG_LOG("failed to map texture!\n");
+                    SOKOL_LOG("failed to map texture!\n");
                 }
             }
         }
@@ -22434,9 +21501,11 @@ _SOKOL_PRIVATE void _sg_d3d11_update_image(_sg_image_t* img, const sg_image_data
 #if __has_feature(objc_arc)
 #define _SG_OBJC_RETAIN(obj) { }
 #define _SG_OBJC_RELEASE(obj) { obj = nil; }
+#define _SG_OBJC_RELEASE_WITH_NULL(obj) { obj = [NSNull null]; }
 #else
 #define _SG_OBJC_RETAIN(obj) { [obj retain]; }
 #define _SG_OBJC_RELEASE(obj) { [obj release]; obj = nil; }
+#define _SG_OBJC_RELEASE_WITH_NULL(obj) { [obj release]; obj = [NSNull null]; }
 #endif
 
 /*-- enum translation functions ----------------------------------------------*/
@@ -22540,7 +21609,6 @@ _SOKOL_PRIVATE MTLPixelFormat _sg_mtl_pixel_format(sg_pixel_format fmt) {
         case SG_PIXELFORMAT_BGRA8:                  return MTLPixelFormatBGRA8Unorm;
         case SG_PIXELFORMAT_RGB10A2:                return MTLPixelFormatRGB10A2Unorm;
         case SG_PIXELFORMAT_RG11B10F:               return MTLPixelFormatRG11B10Float;
-        case SG_PIXELFORMAT_RGB9E5:                 return MTLPixelFormatRGB9E5Float;
         case SG_PIXELFORMAT_RG32UI:                 return MTLPixelFormatRG32Uint;
         case SG_PIXELFORMAT_RG32SI:                 return MTLPixelFormatRG32Sint;
         case SG_PIXELFORMAT_RG32F:                  return MTLPixelFormatRG32Float;
@@ -22833,7 +21901,6 @@ _SOKOL_PRIVATE int _sg_mtl_add_resource(id res) {
         return _SG_MTL_INVALID_SLOT_INDEX;
     }
     const int slot_index = _sg_mtl_alloc_pool_slot();
-    // NOTE: the NSMutableArray will take ownership of its items
     SOKOL_ASSERT([NSNull null] == _sg.mtl.idpool.pool[(NSUInteger)slot_index]);
     _sg.mtl.idpool.pool[(NSUInteger)slot_index] = res;
     return slot_index;
@@ -22873,11 +21940,8 @@ _SOKOL_PRIVATE void _sg_mtl_garbage_collect(uint32_t frame_index) {
         /* safe to release this resource */
         const int slot_index = _sg.mtl.idpool.release_queue[_sg.mtl.idpool.release_queue_back].slot_index;
         SOKOL_ASSERT((slot_index > 0) && (slot_index < _sg.mtl.idpool.num_slots));
-        /* note: the NSMutableArray takes ownership of its items, assigning an NSNull object will
-           release the object, no matter if using ARC or not
-        */
         SOKOL_ASSERT(_sg.mtl.idpool.pool[(NSUInteger)slot_index] != [NSNull null]);
-        _sg.mtl.idpool.pool[(NSUInteger)slot_index] = [NSNull null];
+        _SG_OBJC_RELEASE_WITH_NULL(_sg.mtl.idpool.pool[(NSUInteger)slot_index]);
         /* put the now free pool index back on the free queue */
         _sg_mtl_free_pool_slot(slot_index);
         /* reset the release queue slot and advance the back index */
@@ -22942,7 +22006,6 @@ _SOKOL_PRIVATE int _sg_mtl_create_sampler(id<MTLDevice> mtl_device, const sg_ima
         id<MTLSamplerState> mtl_sampler = [mtl_device newSamplerStateWithDescriptor:mtl_desc];
         _SG_OBJC_RELEASE(mtl_desc);
         int sampler_handle = _sg_mtl_add_resource(mtl_sampler);
-        _SG_OBJC_RELEASE(mtl_sampler);
         _sg_smpcache_add_item(&_sg.mtl.sampler_cache, img_desc, (uintptr_t)sampler_handle);
         return sampler_handle;
     }
@@ -23036,11 +22099,9 @@ _SOKOL_PRIVATE void _sg_mtl_init_caps(void) {
     _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_RGB10A2]);
     _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_RG11B10F]);
     #if defined(_SG_TARGET_MACOS)
-        _sg_pixelformat_sf(&_sg.formats[SG_PIXELFORMAT_RGB9E5]);
         _sg_pixelformat_srm(&_sg.formats[SG_PIXELFORMAT_RG32UI]);
         _sg_pixelformat_srm(&_sg.formats[SG_PIXELFORMAT_RG32SI]);
     #else
-        _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_RGB9E5]);
         _sg_pixelformat_sr(&_sg.formats[SG_PIXELFORMAT_RG32UI]);
         _sg_pixelformat_sr(&_sg.formats[SG_PIXELFORMAT_RG32SI]);
     #endif
@@ -23182,7 +22243,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_context(_sg_context_t* ctx) {
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_context(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     _SOKOL_UNUSED(ctx);
     /* empty */
@@ -23214,12 +22275,11 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_buffer(_sg_buffer_t* buf, const 
             }
         }
         buf->mtl.buf[slot] = _sg_mtl_add_resource(mtl_buf);
-        _SG_OBJC_RELEASE(mtl_buf);
     }
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_buffer(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     for (int slot = 0; slot < buf->cmn.num_slots; slot++) {
         /* it's valid to call release resource with '0' */
@@ -23297,7 +22357,7 @@ _SOKOL_PRIVATE bool _sg_mtl_init_texdesc_common(MTLTextureDescriptor* mtl_desc, 
     mtl_desc.textureType = _sg_mtl_texture_type(img->cmn.type);
     mtl_desc.pixelFormat = _sg_mtl_pixel_format(img->cmn.pixel_format);
     if (MTLPixelFormatInvalid == mtl_desc.pixelFormat) {
-        SG_LOG("Unsupported texture pixel format!\n");
+        SOKOL_LOG("Unsupported texture pixel format!\n");
         return false;
     }
     mtl_desc.width = (NSUInteger)img->cmn.width;
@@ -23316,9 +22376,6 @@ _SOKOL_PRIVATE bool _sg_mtl_init_texdesc_common(MTLTextureDescriptor* mtl_desc, 
         mtl_desc.arrayLength = 1;
     }
     mtl_desc.usage = MTLTextureUsageShaderRead;
-    if (img->cmn.render_target) {
-        mtl_desc.usage |= MTLTextureUsageRenderTarget;
-    }
     MTLResourceOptions res_options = 0;
     if (img->cmn.usage != SG_USAGE_IMMUTABLE) {
         res_options |= MTLResourceCPUCacheModeWriteCombined;
@@ -23395,7 +22452,6 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_image(_sg_image_t* img, const sg
         id<MTLTexture> tex = [_sg.mtl.device newTextureWithDescriptor:mtl_desc];
         SOKOL_ASSERT(nil != tex);
         img->mtl.depth_tex = _sg_mtl_add_resource(tex);
-        _SG_OBJC_RELEASE(tex);
     }
     else {
         /* create the color texture
@@ -23422,7 +22478,6 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_image(_sg_image_t* img, const sg
                 }
             }
             img->mtl.tex[slot] = _sg_mtl_add_resource(tex);
-            _SG_OBJC_RELEASE(tex);
         }
 
         /* if MSAA color render target, create an additional MSAA render-surface texture */
@@ -23430,7 +22485,6 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_image(_sg_image_t* img, const sg
             _sg_mtl_init_texdesc_rt_msaa(mtl_desc, img);
             id<MTLTexture> tex = [_sg.mtl.device newTextureWithDescriptor:mtl_desc];
             img->mtl.msaa_tex = _sg_mtl_add_resource(tex);
-            _SG_OBJC_RELEASE(tex);
         }
 
         /* create (possibly shared) sampler state */
@@ -23440,7 +22494,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_image(_sg_image_t* img, const sg
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_image(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     /* it's valid to call release resource with a 'null resource' */
     for (int slot = 0; slot < img->cmn.num_slots; slot++) {
@@ -23459,7 +22513,7 @@ _SOKOL_PRIVATE id<MTLLibrary> _sg_mtl_compile_library(const char* src) {
         error:&err
     ];
     if (err) {
-        SG_LOG([err.localizedDescription UTF8String]);
+        SOKOL_LOG([err.localizedDescription UTF8String]);
     }
     return lib;
 }
@@ -23469,7 +22523,7 @@ _SOKOL_PRIVATE id<MTLLibrary> _sg_mtl_library_from_bytecode(const void* ptr, siz
     dispatch_data_t lib_data = dispatch_data_create(ptr, num_bytes, NULL, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
     id<MTLLibrary> lib = [_sg.mtl.device newLibraryWithData:lib_data error:&err];
     if (err) {
-        SG_LOG([err.localizedDescription UTF8String]);
+        SOKOL_LOG([err.localizedDescription UTF8String]);
     }
     _SG_OBJC_RELEASE(lib_data);
     return lib;
@@ -23481,18 +22535,18 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_shader(_sg_shader_t* shd, const 
     _sg_shader_common_init(&shd->cmn, desc);
 
     /* create metal libray objects and lookup entry functions */
-    id<MTLLibrary> vs_lib = nil;
-    id<MTLLibrary> fs_lib = nil;
-    id<MTLFunction> vs_func = nil;
-    id<MTLFunction> fs_func = nil;
+    id<MTLLibrary> vs_lib;
+    id<MTLLibrary> fs_lib;
+    id<MTLFunction> vs_func;
+    id<MTLFunction> fs_func;
     const char* vs_entry = desc->vs.entry;
     const char* fs_entry = desc->fs.entry;
     if (desc->vs.bytecode.ptr && desc->fs.bytecode.ptr) {
         /* separate byte code provided */
         vs_lib = _sg_mtl_library_from_bytecode(desc->vs.bytecode.ptr, desc->vs.bytecode.size);
         fs_lib = _sg_mtl_library_from_bytecode(desc->fs.bytecode.ptr, desc->fs.bytecode.size);
-        if ((nil == vs_lib) || (nil == fs_lib)) {
-            goto failed;
+        if (nil == vs_lib || nil == fs_lib) {
+            return SG_RESOURCESTATE_FAILED;
         }
         vs_func = [vs_lib newFunctionWithName:[NSString stringWithUTF8String:vs_entry]];
         fs_func = [fs_lib newFunctionWithName:[NSString stringWithUTF8String:fs_entry]];
@@ -23501,50 +22555,32 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_shader(_sg_shader_t* shd, const 
         /* separate sources provided */
         vs_lib = _sg_mtl_compile_library(desc->vs.source);
         fs_lib = _sg_mtl_compile_library(desc->fs.source);
-        if ((nil == vs_lib) || (nil == fs_lib)) {
-            goto failed;
+        if (nil == vs_lib || nil == fs_lib) {
+            return SG_RESOURCESTATE_FAILED;
         }
         vs_func = [vs_lib newFunctionWithName:[NSString stringWithUTF8String:vs_entry]];
         fs_func = [fs_lib newFunctionWithName:[NSString stringWithUTF8String:fs_entry]];
     }
     else {
-        goto failed;
+        return SG_RESOURCESTATE_FAILED;
     }
     if (nil == vs_func) {
-        SG_LOG("vertex shader entry function not found\n");
-        goto failed;
+        SOKOL_LOG("vertex shader entry function not found\n");
+        return SG_RESOURCESTATE_FAILED;
     }
     if (nil == fs_func) {
-        SG_LOG("fragment shader entry function not found\n");
-        goto failed;
+        SOKOL_LOG("fragment shader entry function not found\n");
+        return SG_RESOURCESTATE_FAILED;
     }
     /* it is legal to call _sg_mtl_add_resource with a nil value, this will return a special 0xFFFFFFFF index */
     shd->mtl.stage[SG_SHADERSTAGE_VS].mtl_lib  = _sg_mtl_add_resource(vs_lib);
-    _SG_OBJC_RELEASE(vs_lib);
     shd->mtl.stage[SG_SHADERSTAGE_FS].mtl_lib  = _sg_mtl_add_resource(fs_lib);
-    _SG_OBJC_RELEASE(fs_lib);
     shd->mtl.stage[SG_SHADERSTAGE_VS].mtl_func = _sg_mtl_add_resource(vs_func);
-    _SG_OBJC_RELEASE(vs_func);
     shd->mtl.stage[SG_SHADERSTAGE_FS].mtl_func = _sg_mtl_add_resource(fs_func);
-    _SG_OBJC_RELEASE(fs_func);
     return SG_RESOURCESTATE_VALID;
-failed:
-    if (vs_lib != nil) {
-        _SG_OBJC_RELEASE(vs_lib);
-    }
-    if (fs_lib != nil) {
-        _SG_OBJC_RELEASE(fs_lib);
-    }
-    if (vs_func != nil) {
-        _SG_OBJC_RELEASE(vs_func);
-    }
-    if (fs_func != nil) {
-        _SG_OBJC_RELEASE(fs_func);
-    }
-    return SG_RESOURCESTATE_FAILED;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_shader(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     /* it is valid to call _sg_mtl_release_resource with a 'null resource' */
     _sg_mtl_release_resource(_sg.mtl.frame_index, shd->mtl.stage[SG_SHADERSTAGE_VS].mtl_func);
@@ -23605,7 +22641,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_pipeline(_sg_pipeline_t* pip, _s
     rp_desc.vertexFunction = _sg_mtl_id(shd->mtl.stage[SG_SHADERSTAGE_VS].mtl_func);
     SOKOL_ASSERT(shd->mtl.stage[SG_SHADERSTAGE_FS].mtl_func != _SG_MTL_INVALID_SLOT_INDEX);
     rp_desc.fragmentFunction = _sg_mtl_id(shd->mtl.stage[SG_SHADERSTAGE_FS].mtl_func);
-    rp_desc.rasterSampleCount = (NSUInteger)desc->sample_count;
+    rp_desc.sampleCount = (NSUInteger)desc->sample_count;
     rp_desc.alphaToCoverageEnabled = desc->alpha_to_coverage_enabled;
     rp_desc.alphaToOneEnabled = NO;
     rp_desc.rasterizationEnabled = YES;
@@ -23639,7 +22675,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_pipeline(_sg_pipeline_t* pip, _s
     _SG_OBJC_RELEASE(rp_desc);
     if (nil == mtl_rps) {
         SOKOL_ASSERT(err);
-        SG_LOG([err.localizedDescription UTF8String]);
+        SOKOL_LOG([err.localizedDescription UTF8String]);
         return SG_RESOURCESTATE_FAILED;
     }
 
@@ -23668,13 +22704,11 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_pipeline(_sg_pipeline_t* pip, _s
     id<MTLDepthStencilState> mtl_dss = [_sg.mtl.device newDepthStencilStateWithDescriptor:ds_desc];
     _SG_OBJC_RELEASE(ds_desc);
     pip->mtl.rps = _sg_mtl_add_resource(mtl_rps);
-    _SG_OBJC_RELEASE(mtl_rps);
     pip->mtl.dss = _sg_mtl_add_resource(mtl_dss);
-    _SG_OBJC_RELEASE(mtl_dss);
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_pipeline(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     /* it's valid to call release resource with a 'null resource' */
     _sg_mtl_release_resource(_sg.mtl.frame_index, pip->mtl.rps);
@@ -23710,7 +22744,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_mtl_create_pass(_sg_pass_t* pass, _sg_image
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_mtl_discard_pass(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_mtl_destroy_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     _SOKOL_UNUSED(pass);
 }
@@ -24361,7 +23395,6 @@ _SOKOL_PRIVATE WGPUTextureFormat _sg_wgpu_textureformat(sg_pixel_format p) {
         case SG_PIXELFORMAT_RG16SN:
         case SG_PIXELFORMAT_RGBA16:
         case SG_PIXELFORMAT_RGBA16SN:
-        case SG_PIXELFORMAT_RGB9E5:
         case SG_PIXELFORMAT_PVRTC_RGB_2BPP:
         case SG_PIXELFORMAT_PVRTC_RGB_4BPP:
         case SG_PIXELFORMAT_PVRTC_RGBA_2BPP:
@@ -24509,7 +23542,6 @@ _SOKOL_PRIVATE void _sg_wgpu_init_caps(void) {
     _sg_pixelformat_srm(&_sg.formats[SG_PIXELFORMAT_RGBA8SI]);
     _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_BGRA8]);
     _sg_pixelformat_all(&_sg.formats[SG_PIXELFORMAT_RGB10A2]);
-    /* FIXME: missing SG_PIXELFORMAT_RG11B10F */
     _sg_pixelformat_sr(&_sg.formats[SG_PIXELFORMAT_RG32UI]);
     _sg_pixelformat_sr(&_sg.formats[SG_PIXELFORMAT_RG32SI]);
     _sg_pixelformat_sbr(&_sg.formats[SG_PIXELFORMAT_RG32F]);
@@ -24635,7 +23667,7 @@ _SOKOL_PRIVATE void _sg_wgpu_ubpool_mapped_callback(WGPUBufferMapAsyncStatus sta
     }
     /* FIXME: better handling for this */
     if (WGPUBufferMapAsyncStatus_Success != status) {
-        SG_LOG("Mapping uniform buffer failed!\n");
+        SOKOL_LOG("Mapping uniform buffer failed!\n");
         SOKOL_ASSERT(false);
     }
     SOKOL_ASSERT(data && (data_len == _sg.wgpu.ub.num_bytes));
@@ -24894,7 +23926,7 @@ _SOKOL_PRIVATE uint32_t _sg_wgpu_staging_copy_to_buffer(WGPUBuffer dst_buf, uint
     SOKOL_ASSERT(data_num_bytes > 0);
     uint32_t copy_num_bytes = _sg_roundup(data_num_bytes, 4);
     if ((_sg.wgpu.staging.offset + copy_num_bytes) >= _sg.wgpu.staging.num_bytes) {
-        SG_LOG("WGPU: Per frame staging buffer full (in _sg_wgpu_staging_copy_to_buffer())!\n");
+        SOKOL_LOG("WGPU: Per frame staging buffer full (in _sg_wgpu_staging_copy_to_buffer())!\n");
         return false;
     }
     const int cur = _sg.wgpu.staging.cur;
@@ -24913,7 +23945,7 @@ _SOKOL_PRIVATE bool _sg_wgpu_staging_copy_to_texture(_sg_image_t* img, const sg_
     SOKOL_ASSERT(_sg.wgpu.staging_cmd_enc);
     uint32_t num_bytes = _sg_wgpu_image_data_buffer_size(img);
     if ((_sg.wgpu.staging.offset + num_bytes) >= _sg.wgpu.staging.num_bytes) {
-        SG_LOG("WGPU: Per frame staging buffer full (in _sg_wgpu_staging_copy_to_texture)!\n");
+        SOKOL_LOG("WGPU: Per frame staging buffer full (in _sg_wgpu_staging_copy_to_texture)!\n");
         return false;
     }
     const int cur = _sg.wgpu.staging.cur;
@@ -25051,7 +24083,7 @@ _SOKOL_PRIVATE void _sg_wgpu_discard_backend(void) {
 }
 
 _SOKOL_PRIVATE void _sg_wgpu_reset_state_cache(void) {
-    SG_LOG("_sg_wgpu_reset_state_cache: FIXME\n");
+    SOKOL_LOG("_sg_wgpu_reset_state_cache: FIXME\n");
 }
 
 _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_context(_sg_context_t* ctx) {
@@ -25060,14 +24092,14 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_context(_sg_context_t* ctx) {
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_context(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     _SOKOL_UNUSED(ctx);
 }
 
 _SOKOL_PRIVATE void _sg_wgpu_activate_context(_sg_context_t* ctx) {
     (void)ctx;
-    SG_LOG("_sg_wgpu_activate_context: FIXME\n");
+    SOKOL_LOG("_sg_wgpu_activate_context: FIXME\n");
 }
 
 _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_buffer(_sg_buffer_t* buf, const sg_buffer_desc* desc) {
@@ -25098,7 +24130,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_buffer(_sg_buffer_t* buf, const
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_buffer(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     WGPUBuffer wgpu_buf = buf->wgpu.buf;
     if (0 != wgpu_buf) {
@@ -25212,7 +24244,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_image(_sg_image_t* img, const s
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_image(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     if (img->wgpu.tex) {
         wgpuTextureRelease(img->wgpu.tex);
@@ -25313,7 +24345,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_shader(_sg_shader_t* shd, const
     return success ? SG_RESOURCESTATE_VALID : SG_RESOURCESTATE_FAILED;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_shader(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     for (int stage_index = 0; stage_index < SG_NUM_SHADER_STAGES; stage_index++) {
         _sg_wgpu_shader_stage_t* wgpu_stage = &shd->wgpu.stage[stage_index];
@@ -25452,7 +24484,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_pipeline(_sg_pipeline_t* pip, _
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_pipeline(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     if (pip == _sg.wgpu.cur_pipeline) {
         _sg.wgpu.cur_pipeline = 0;
@@ -25523,7 +24555,7 @@ _SOKOL_PRIVATE sg_resource_state _sg_wgpu_create_pass(_sg_pass_t* pass, _sg_imag
     return SG_RESOURCESTATE_VALID;
 }
 
-_SOKOL_PRIVATE void _sg_wgpu_discard_pass(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_wgpu_destroy_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     for (uint32_t i = 0; i < pass->cmn.num_color_atts; i++) {
         if (pass->wgpu.color_atts[i].render_tex_view) {
@@ -25949,17 +24981,17 @@ static inline sg_resource_state _sg_create_context(_sg_context_t* ctx) {
     #endif
 }
 
-static inline void _sg_discard_context(_sg_context_t* ctx) {
+static inline void _sg_destroy_context(_sg_context_t* ctx) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_context(ctx);
+    _sg_gl_destroy_context(ctx);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_context(ctx);
+    _sg_mtl_destroy_context(ctx);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_context(ctx);
+    _sg_d3d11_destroy_context(ctx);
     #elif defined(SOKOL_WGPU)
-    _sg_wgpu_discard_context(ctx);
+    _sg_wgpu_destroy_context(ctx);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_context(ctx);
+    _sg_dummy_destroy_context(ctx);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -25981,17 +25013,17 @@ static inline sg_resource_state _sg_create_buffer(_sg_buffer_t* buf, const sg_bu
     #endif
 }
 
-static inline void _sg_discard_buffer(_sg_buffer_t* buf) {
+static inline void _sg_destroy_buffer(_sg_buffer_t* buf) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_buffer(buf);
+    _sg_gl_destroy_buffer(buf);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_buffer(buf);
+    _sg_mtl_destroy_buffer(buf);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_buffer(buf);
+    _sg_d3d11_destroy_buffer(buf);
     #elif defined(SOKOL_WGPU)
-    _sg_wgpu_discard_buffer(buf);
+    _sg_wgpu_destroy_buffer(buf);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_buffer(buf);
+    _sg_dummy_destroy_buffer(buf);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -26013,17 +25045,17 @@ static inline sg_resource_state _sg_create_image(_sg_image_t* img, const sg_imag
     #endif
 }
 
-static inline void _sg_discard_image(_sg_image_t* img) {
+static inline void _sg_destroy_image(_sg_image_t* img) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_image(img);
+    _sg_gl_destroy_image(img);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_image(img);
+    _sg_mtl_destroy_image(img);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_image(img);
+    _sg_d3d11_destroy_image(img);
     #elif defined(SOKOL_WGPU)
-    _sg_wgpu_discard_image(img);
+    _sg_wgpu_destroy_image(img);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_image(img);
+    _sg_dummy_destroy_image(img);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -26045,17 +25077,17 @@ static inline sg_resource_state _sg_create_shader(_sg_shader_t* shd, const sg_sh
     #endif
 }
 
-static inline void _sg_discard_shader(_sg_shader_t* shd) {
+static inline void _sg_destroy_shader(_sg_shader_t* shd) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_shader(shd);
+    _sg_gl_destroy_shader(shd);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_shader(shd);
+    _sg_mtl_destroy_shader(shd);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_shader(shd);
+    _sg_d3d11_destroy_shader(shd);
     #elif defined(SOKOL_WGPU)
-    _sg_wgpu_discard_shader(shd);
+    _sg_wgpu_destroy_shader(shd);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_shader(shd);
+    _sg_dummy_destroy_shader(shd);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -26077,17 +25109,17 @@ static inline sg_resource_state _sg_create_pipeline(_sg_pipeline_t* pip, _sg_sha
     #endif
 }
 
-static inline void _sg_discard_pipeline(_sg_pipeline_t* pip) {
+static inline void _sg_destroy_pipeline(_sg_pipeline_t* pip) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_pipeline(pip);
+    _sg_gl_destroy_pipeline(pip);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_pipeline(pip);
+    _sg_mtl_destroy_pipeline(pip);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_pipeline(pip);
+    _sg_d3d11_destroy_pipeline(pip);
     #elif defined(SOKOL_WGPU)
-    _sg_wgpu_discard_pipeline(pip);
+    _sg_wgpu_destroy_pipeline(pip);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_pipeline(pip);
+    _sg_dummy_destroy_pipeline(pip);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -26109,17 +25141,17 @@ static inline sg_resource_state _sg_create_pass(_sg_pass_t* pass, _sg_image_t** 
     #endif
 }
 
-static inline void _sg_discard_pass(_sg_pass_t* pass) {
+static inline void _sg_destroy_pass(_sg_pass_t* pass) {
     #if defined(_SOKOL_ANY_GL)
-    _sg_gl_discard_pass(pass);
+    _sg_gl_destroy_pass(pass);
     #elif defined(SOKOL_METAL)
-    _sg_mtl_discard_pass(pass);
+    _sg_mtl_destroy_pass(pass);
     #elif defined(SOKOL_D3D11)
-    _sg_d3d11_discard_pass(pass);
+    _sg_d3d11_destroy_pass(pass);
     #elif defined(SOKOL_WGPU)
-    return _sg_wgpu_discard_pass(pass);
+    return _sg_wgpu_destroy_pass(pass);
     #elif defined(SOKOL_DUMMY_BACKEND)
-    _sg_dummy_discard_pass(pass);
+    _sg_dummy_destroy_pass(pass);
     #else
     #error("INVALID BACKEND");
     #endif
@@ -26419,7 +25451,7 @@ _SOKOL_PRIVATE void _sg_reset_slot(_sg_slot_t* slot) {
     _sg_clear(slot, sizeof(_sg_slot_t));
 }
 
-_SOKOL_PRIVATE void _sg_reset_buffer_to_alloc_state(_sg_buffer_t* buf) {
+_SOKOL_PRIVATE void _sg_reset_buffer(_sg_buffer_t* buf) {
     SOKOL_ASSERT(buf);
     _sg_slot_t slot = buf->slot;
     _sg_clear(buf, sizeof(_sg_buffer_t));
@@ -26427,7 +25459,7 @@ _SOKOL_PRIVATE void _sg_reset_buffer_to_alloc_state(_sg_buffer_t* buf) {
     buf->slot.state = SG_RESOURCESTATE_ALLOC;
 }
 
-_SOKOL_PRIVATE void _sg_reset_image_to_alloc_state(_sg_image_t* img) {
+_SOKOL_PRIVATE void _sg_reset_image(_sg_image_t* img) {
     SOKOL_ASSERT(img);
     _sg_slot_t slot = img->slot;
     _sg_clear(img, sizeof(_sg_image_t));
@@ -26435,7 +25467,7 @@ _SOKOL_PRIVATE void _sg_reset_image_to_alloc_state(_sg_image_t* img) {
     img->slot.state = SG_RESOURCESTATE_ALLOC;
 }
 
-_SOKOL_PRIVATE void _sg_reset_shader_to_alloc_state(_sg_shader_t* shd) {
+_SOKOL_PRIVATE void _sg_reset_shader(_sg_shader_t* shd) {
     SOKOL_ASSERT(shd);
     _sg_slot_t slot = shd->slot;
     _sg_clear(shd, sizeof(_sg_shader_t));
@@ -26443,7 +25475,7 @@ _SOKOL_PRIVATE void _sg_reset_shader_to_alloc_state(_sg_shader_t* shd) {
     shd->slot.state = SG_RESOURCESTATE_ALLOC;
 }
 
-_SOKOL_PRIVATE void _sg_reset_pipeline_to_alloc_state(_sg_pipeline_t* pip) {
+_SOKOL_PRIVATE void _sg_reset_pipeline(_sg_pipeline_t* pip) {
     SOKOL_ASSERT(pip);
     _sg_slot_t slot = pip->slot;
     _sg_clear(pip, sizeof(_sg_pipeline_t));
@@ -26451,7 +25483,7 @@ _SOKOL_PRIVATE void _sg_reset_pipeline_to_alloc_state(_sg_pipeline_t* pip) {
     pip->slot.state = SG_RESOURCESTATE_ALLOC;
 }
 
-_SOKOL_PRIVATE void _sg_reset_pass_to_alloc_state(_sg_pass_t* pass) {
+_SOKOL_PRIVATE void _sg_reset_pass(_sg_pass_t* pass) {
     SOKOL_ASSERT(pass);
     _sg_slot_t slot = pass->slot;
     _sg_clear(pass, sizeof(_sg_pass_t));
@@ -26459,7 +25491,7 @@ _SOKOL_PRIVATE void _sg_reset_pass_to_alloc_state(_sg_pass_t* pass) {
     pass->slot.state = SG_RESOURCESTATE_ALLOC;
 }
 
-_SOKOL_PRIVATE void _sg_reset_context_to_alloc_state(_sg_context_t* ctx) {
+_SOKOL_PRIVATE void _sg_reset_context(_sg_context_t* ctx) {
     SOKOL_ASSERT(ctx);
     _sg_slot_t slot = ctx->slot;
     _sg_clear(ctx, sizeof(_sg_context_t));
@@ -26654,7 +25686,7 @@ _SOKOL_PRIVATE _sg_context_t* _sg_lookup_context(const _sg_pools_t* p, uint32_t 
     return 0;
 }
 
-_SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
+_SOKOL_PRIVATE void _sg_destroy_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
     /*  this is a bit dumb since it loops over all pool slots to
         find the occupied slots, on the other hand it is only ever
         executed at shutdown
@@ -26666,7 +25698,7 @@ _SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
         if (p->buffers[i].slot.ctx_id == ctx_id) {
             sg_resource_state state = p->buffers[i].slot.state;
             if ((state == SG_RESOURCESTATE_VALID) || (state == SG_RESOURCESTATE_FAILED)) {
-                _sg_discard_buffer(&p->buffers[i]);
+                _sg_destroy_buffer(&p->buffers[i]);
             }
         }
     }
@@ -26674,7 +25706,7 @@ _SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
         if (p->images[i].slot.ctx_id == ctx_id) {
             sg_resource_state state = p->images[i].slot.state;
             if ((state == SG_RESOURCESTATE_VALID) || (state == SG_RESOURCESTATE_FAILED)) {
-                _sg_discard_image(&p->images[i]);
+                _sg_destroy_image(&p->images[i]);
             }
         }
     }
@@ -26682,7 +25714,7 @@ _SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
         if (p->shaders[i].slot.ctx_id == ctx_id) {
             sg_resource_state state = p->shaders[i].slot.state;
             if ((state == SG_RESOURCESTATE_VALID) || (state == SG_RESOURCESTATE_FAILED)) {
-                _sg_discard_shader(&p->shaders[i]);
+                _sg_destroy_shader(&p->shaders[i]);
             }
         }
     }
@@ -26690,7 +25722,7 @@ _SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
         if (p->pipelines[i].slot.ctx_id == ctx_id) {
             sg_resource_state state = p->pipelines[i].slot.state;
             if ((state == SG_RESOURCESTATE_VALID) || (state == SG_RESOURCESTATE_FAILED)) {
-                _sg_discard_pipeline(&p->pipelines[i]);
+                _sg_destroy_pipeline(&p->pipelines[i]);
             }
         }
     }
@@ -26698,7 +25730,7 @@ _SOKOL_PRIVATE void _sg_discard_all_resources(_sg_pools_t* p, uint32_t ctx_id) {
         if (p->passes[i].slot.ctx_id == ctx_id) {
             sg_resource_state state = p->passes[i].slot.state;
             if ((state == SG_RESOURCESTATE_VALID) || (state == SG_RESOURCESTATE_FAILED)) {
-                _sg_discard_pass(&p->passes[i]);
+                _sg_destroy_pass(&p->passes[i]);
             }
         }
     }
@@ -26747,7 +25779,7 @@ _SOKOL_PRIVATE const char* _sg_validate_string(_sg_validate_error_t err) {
         case _SG_VALIDATE_SHADERDESC_UB_SIZE_MISMATCH:      return "size of uniform block members doesn't match uniform block size";
         case _SG_VALIDATE_SHADERDESC_UB_ARRAY_COUNT:        return "uniform array count must be >= 1";
         case _SG_VALIDATE_SHADERDESC_UB_STD140_ARRAY_TYPE:  return "uniform arrays only allowed for FLOAT4, INT4, MAT4 in std140 layout";
-
+        
         case _SG_VALIDATE_SHADERDESC_NO_CONT_IMGS:          return "shader images must occupy continuous slots";
         case _SG_VALIDATE_SHADERDESC_IMG_NAME:              return "GL backend requires uniform block member names";
         case _SG_VALIDATE_SHADERDESC_ATTR_NAMES:            return "GLES2 backend requires vertex attribute names";
@@ -26846,14 +25878,14 @@ _SOKOL_PRIVATE void _sg_validate_begin(void) {
 _SOKOL_PRIVATE void _sg_validate(bool cond, _sg_validate_error_t err) {
     if (!cond) {
         _sg.validate_error = err;
-        SG_LOG(_sg_validate_string(err));
+        SOKOL_LOG(_sg_validate_string(err));
     }
 }
 
 _SOKOL_PRIVATE bool _sg_validate_end(void) {
     if (_sg.validate_error != _SG_VALIDATE_SUCCESS) {
         #if !defined(SOKOL_VALIDATE_NON_FATAL)
-            SG_LOG("^^^^  SOKOL-GFX VALIDATION FAILED, TERMINATING ^^^^");
+            SOKOL_LOG("^^^^  SOKOL-GFX VALIDATION FAILED, TERMINATING ^^^^");
             SOKOL_ASSERT(false);
         #endif
         return false;
@@ -26869,9 +25901,6 @@ _SOKOL_PRIVATE bool _sg_validate_buffer_desc(const sg_buffer_desc* desc) {
         _SOKOL_UNUSED(desc);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(desc);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(desc->_start_canary == 0, _SG_VALIDATE_BUFFERDESC_CANARY);
@@ -26922,9 +25951,6 @@ _SOKOL_PRIVATE bool _sg_validate_image_desc(const sg_image_desc* desc) {
         _SOKOL_UNUSED(desc);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(desc);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(desc->_start_canary == 0, _SG_VALIDATE_IMAGEDESC_CANARY);
@@ -26997,9 +26023,6 @@ _SOKOL_PRIVATE bool _sg_validate_shader_desc(const sg_shader_desc* desc) {
         _SOKOL_UNUSED(desc);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(desc);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(desc->_start_canary == 0, _SG_VALIDATE_SHADERDESC_CANARY);
@@ -27109,9 +26132,6 @@ _SOKOL_PRIVATE bool _sg_validate_pipeline_desc(const sg_pipeline_desc* desc) {
         _SOKOL_UNUSED(desc);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(desc);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(desc->_start_canary == 0, _SG_VALIDATE_PIPELINEDESC_CANARY);
@@ -27156,9 +26176,6 @@ _SOKOL_PRIVATE bool _sg_validate_pass_desc(const sg_pass_desc* desc) {
         _SOKOL_UNUSED(desc);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(desc);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(desc->_start_canary == 0, _SG_VALIDATE_PASSDESC_CANARY);
@@ -27229,9 +26246,6 @@ _SOKOL_PRIVATE bool _sg_validate_begin_pass(_sg_pass_t* pass) {
         _SOKOL_UNUSED(pass);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(pass->slot.state == SG_RESOURCESTATE_VALID, _SG_VALIDATE_BEGINPASS_PASS);
 
@@ -27258,9 +26272,6 @@ _SOKOL_PRIVATE bool _sg_validate_apply_pipeline(sg_pipeline pip_id) {
         _SOKOL_UNUSED(pip_id);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_VALIDATE_BEGIN();
         /* the pipeline object must be alive and valid */
         SOKOL_VALIDATE(pip_id.id != SG_INVALID_ID, _SG_VALIDATE_APIP_PIPELINE_VALID_ID);
@@ -27308,9 +26319,6 @@ _SOKOL_PRIVATE bool _sg_validate_apply_bindings(const sg_bindings* bindings) {
         _SOKOL_UNUSED(bindings);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_VALIDATE_BEGIN();
 
         /* a pipeline object must have been applied */
@@ -27402,9 +26410,6 @@ _SOKOL_PRIVATE bool _sg_validate_apply_uniforms(sg_shader_stage stage_index, int
         _SOKOL_UNUSED(data);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT((stage_index == SG_SHADERSTAGE_VS) || (stage_index == SG_SHADERSTAGE_FS));
         SOKOL_ASSERT((ub_index >= 0) && (ub_index < SG_MAX_SHADERSTAGE_UBS));
         SOKOL_VALIDATE_BEGIN();
@@ -27430,9 +26435,6 @@ _SOKOL_PRIVATE bool _sg_validate_update_buffer(const _sg_buffer_t* buf, const sg
         _SOKOL_UNUSED(data);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(buf && data && data->ptr);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(buf->cmn.usage != SG_USAGE_IMMUTABLE, _SG_VALIDATE_UPDATEBUF_USAGE);
@@ -27449,9 +26451,6 @@ _SOKOL_PRIVATE bool _sg_validate_append_buffer(const _sg_buffer_t* buf, const sg
         _SOKOL_UNUSED(data);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(buf && data && data->ptr);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(buf->cmn.usage != SG_USAGE_IMMUTABLE, _SG_VALIDATE_APPENDBUF_USAGE);
@@ -27467,9 +26466,6 @@ _SOKOL_PRIVATE bool _sg_validate_update_image(const _sg_image_t* img, const sg_i
         _SOKOL_UNUSED(data);
         return true;
     #else
-        if (_sg.desc.disable_validation) {
-            return true;
-        }
         SOKOL_ASSERT(img && data);
         SOKOL_VALIDATE_BEGIN();
         SOKOL_VALIDATE(img->cmn.usage != SG_USAGE_IMMUTABLE, _SG_VALIDATE_UPDIMG_USAGE);
@@ -27720,39 +26716,50 @@ _SOKOL_PRIVATE sg_pass _sg_alloc_pass(void) {
     return res;
 }
 
-_SOKOL_PRIVATE void _sg_dealloc_buffer(_sg_buffer_t* buf) {
-    SOKOL_ASSERT(buf && (buf->slot.state == SG_RESOURCESTATE_ALLOC) && (buf->slot.id != SG_INVALID_ID));
-    _sg_pool_free_index(&_sg.pools.buffer_pool, _sg_slot_index(buf->slot.id));
+_SOKOL_PRIVATE void _sg_dealloc_buffer(sg_buffer buf_id) {
+    SOKOL_ASSERT(buf_id.id != SG_INVALID_ID);
+    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
+    SOKOL_ASSERT(buf && buf->slot.state == SG_RESOURCESTATE_ALLOC);
     _sg_reset_slot(&buf->slot);
+    _sg_pool_free_index(&_sg.pools.buffer_pool, _sg_slot_index(buf_id.id));
 }
 
-_SOKOL_PRIVATE void _sg_dealloc_image(_sg_image_t* img) {
-    SOKOL_ASSERT(img && (img->slot.state == SG_RESOURCESTATE_ALLOC) && (img->slot.id != SG_INVALID_ID));
-    _sg_pool_free_index(&_sg.pools.image_pool, _sg_slot_index(img->slot.id));
+_SOKOL_PRIVATE void _sg_dealloc_image(sg_image img_id) {
+    SOKOL_ASSERT(img_id.id != SG_INVALID_ID);
+    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
+    SOKOL_ASSERT(img && img->slot.state == SG_RESOURCESTATE_ALLOC);
     _sg_reset_slot(&img->slot);
+    _sg_pool_free_index(&_sg.pools.image_pool, _sg_slot_index(img_id.id));
 }
 
-_SOKOL_PRIVATE void _sg_dealloc_shader(_sg_shader_t* shd) {
-    SOKOL_ASSERT(shd && (shd->slot.state == SG_RESOURCESTATE_ALLOC) && (shd->slot.id != SG_INVALID_ID));
-    _sg_pool_free_index(&_sg.pools.shader_pool, _sg_slot_index(shd->slot.id));
+_SOKOL_PRIVATE void _sg_dealloc_shader(sg_shader shd_id) {
+    SOKOL_ASSERT(shd_id.id != SG_INVALID_ID);
+    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
+    SOKOL_ASSERT(shd && shd->slot.state == SG_RESOURCESTATE_ALLOC);
     _sg_reset_slot(&shd->slot);
+    _sg_pool_free_index(&_sg.pools.shader_pool, _sg_slot_index(shd_id.id));
 }
 
-_SOKOL_PRIVATE void _sg_dealloc_pipeline(_sg_pipeline_t* pip) {
-    SOKOL_ASSERT(pip && (pip->slot.state == SG_RESOURCESTATE_ALLOC) && (pip->slot.id != SG_INVALID_ID));
-    _sg_pool_free_index(&_sg.pools.pipeline_pool, _sg_slot_index(pip->slot.id));
+_SOKOL_PRIVATE void _sg_dealloc_pipeline(sg_pipeline pip_id) {
+    SOKOL_ASSERT(pip_id.id != SG_INVALID_ID);
+    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
+    SOKOL_ASSERT(pip && pip->slot.state == SG_RESOURCESTATE_ALLOC);
     _sg_reset_slot(&pip->slot);
+    _sg_pool_free_index(&_sg.pools.pipeline_pool, _sg_slot_index(pip_id.id));
 }
 
-_SOKOL_PRIVATE void _sg_dealloc_pass(_sg_pass_t* pass) {
-    SOKOL_ASSERT(pass && (pass->slot.state == SG_RESOURCESTATE_ALLOC) && (pass->slot.id != SG_INVALID_ID));
-    _sg_pool_free_index(&_sg.pools.pass_pool, _sg_slot_index(pass->slot.id));
+_SOKOL_PRIVATE void _sg_dealloc_pass(sg_pass pass_id) {
+    SOKOL_ASSERT(pass_id.id != SG_INVALID_ID);
+    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
+    SOKOL_ASSERT(pass && pass->slot.state == SG_RESOURCESTATE_ALLOC);
     _sg_reset_slot(&pass->slot);
+    _sg_pool_free_index(&_sg.pools.pass_pool, _sg_slot_index(pass_id.id));
 }
 
-_SOKOL_PRIVATE void _sg_init_buffer(_sg_buffer_t* buf, const sg_buffer_desc* desc) {
-    SOKOL_ASSERT(buf && (buf->slot.state == SG_RESOURCESTATE_ALLOC));
-    SOKOL_ASSERT(desc);
+_SOKOL_PRIVATE void _sg_init_buffer(sg_buffer buf_id, const sg_buffer_desc* desc) {
+    SOKOL_ASSERT(buf_id.id != SG_INVALID_ID && desc);
+    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
+    SOKOL_ASSERT(buf && buf->slot.state == SG_RESOURCESTATE_ALLOC);
     buf->slot.ctx_id = _sg.active_context.id;
     if (_sg_validate_buffer_desc(desc)) {
         buf->slot.state = _sg_create_buffer(buf, desc);
@@ -27763,9 +26770,10 @@ _SOKOL_PRIVATE void _sg_init_buffer(_sg_buffer_t* buf, const sg_buffer_desc* des
     SOKOL_ASSERT((buf->slot.state == SG_RESOURCESTATE_VALID)||(buf->slot.state == SG_RESOURCESTATE_FAILED));
 }
 
-_SOKOL_PRIVATE void _sg_init_image(_sg_image_t* img, const sg_image_desc* desc) {
-    SOKOL_ASSERT(img && (img->slot.state == SG_RESOURCESTATE_ALLOC));
-    SOKOL_ASSERT(desc);
+_SOKOL_PRIVATE void _sg_init_image(sg_image img_id, const sg_image_desc* desc) {
+    SOKOL_ASSERT(img_id.id != SG_INVALID_ID && desc);
+    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
+    SOKOL_ASSERT(img && img->slot.state == SG_RESOURCESTATE_ALLOC);
     img->slot.ctx_id = _sg.active_context.id;
     if (_sg_validate_image_desc(desc)) {
         img->slot.state = _sg_create_image(img, desc);
@@ -27776,9 +26784,10 @@ _SOKOL_PRIVATE void _sg_init_image(_sg_image_t* img, const sg_image_desc* desc) 
     SOKOL_ASSERT((img->slot.state == SG_RESOURCESTATE_VALID)||(img->slot.state == SG_RESOURCESTATE_FAILED));
 }
 
-_SOKOL_PRIVATE void _sg_init_shader(_sg_shader_t* shd, const sg_shader_desc* desc) {
-    SOKOL_ASSERT(shd && (shd->slot.state == SG_RESOURCESTATE_ALLOC));
-    SOKOL_ASSERT(desc);
+_SOKOL_PRIVATE void _sg_init_shader(sg_shader shd_id, const sg_shader_desc* desc) {
+    SOKOL_ASSERT(shd_id.id != SG_INVALID_ID && desc);
+    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
+    SOKOL_ASSERT(shd && shd->slot.state == SG_RESOURCESTATE_ALLOC);
     shd->slot.ctx_id = _sg.active_context.id;
     if (_sg_validate_shader_desc(desc)) {
         shd->slot.state = _sg_create_shader(shd, desc);
@@ -27789,9 +26798,10 @@ _SOKOL_PRIVATE void _sg_init_shader(_sg_shader_t* shd, const sg_shader_desc* des
     SOKOL_ASSERT((shd->slot.state == SG_RESOURCESTATE_VALID)||(shd->slot.state == SG_RESOURCESTATE_FAILED));
 }
 
-_SOKOL_PRIVATE void _sg_init_pipeline(_sg_pipeline_t* pip, const sg_pipeline_desc* desc) {
-    SOKOL_ASSERT(pip && (pip->slot.state == SG_RESOURCESTATE_ALLOC));
-    SOKOL_ASSERT(desc);
+_SOKOL_PRIVATE void _sg_init_pipeline(sg_pipeline pip_id, const sg_pipeline_desc* desc) {
+    SOKOL_ASSERT(pip_id.id != SG_INVALID_ID && desc);
+    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
+    SOKOL_ASSERT(pip && pip->slot.state == SG_RESOURCESTATE_ALLOC);
     pip->slot.ctx_id = _sg.active_context.id;
     if (_sg_validate_pipeline_desc(desc)) {
         _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, desc->shader.id);
@@ -27808,9 +26818,10 @@ _SOKOL_PRIVATE void _sg_init_pipeline(_sg_pipeline_t* pip, const sg_pipeline_des
     SOKOL_ASSERT((pip->slot.state == SG_RESOURCESTATE_VALID)||(pip->slot.state == SG_RESOURCESTATE_FAILED));
 }
 
-_SOKOL_PRIVATE void _sg_init_pass(_sg_pass_t* pass, const sg_pass_desc* desc) {
+_SOKOL_PRIVATE void _sg_init_pass(sg_pass pass_id, const sg_pass_desc* desc) {
+    SOKOL_ASSERT(pass_id.id != SG_INVALID_ID && desc);
+    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
     SOKOL_ASSERT(pass && pass->slot.state == SG_RESOURCESTATE_ALLOC);
-    SOKOL_ASSERT(desc);
     pass->slot.ctx_id = _sg.active_context.id;
     if (_sg_validate_pass_desc(desc)) {
         /* lookup pass attachment image pointers */
@@ -27818,10 +26829,8 @@ _SOKOL_PRIVATE void _sg_init_pass(_sg_pass_t* pass, const sg_pass_desc* desc) {
         for (int i = 0; i < SG_MAX_COLOR_ATTACHMENTS; i++) {
             if (desc->color_attachments[i].image.id) {
                 att_imgs[i] = _sg_lookup_image(&_sg.pools, desc->color_attachments[i].image.id);
-                if (!(att_imgs[i] && att_imgs[i]->slot.state == SG_RESOURCESTATE_VALID)) {
-                    pass->slot.state = SG_RESOURCESTATE_FAILED;
-                    return;
-                }
+                /* FIXME: this shouldn't be an assertion, but result in a SG_RESOURCESTATE_FAILED pass */
+                SOKOL_ASSERT(att_imgs[i] && att_imgs[i]->slot.state == SG_RESOURCESTATE_VALID);
             }
             else {
                 att_imgs[i] = 0;
@@ -27830,10 +26839,8 @@ _SOKOL_PRIVATE void _sg_init_pass(_sg_pass_t* pass, const sg_pass_desc* desc) {
         const int ds_att_index = SG_MAX_COLOR_ATTACHMENTS;
         if (desc->depth_stencil_attachment.image.id) {
             att_imgs[ds_att_index] = _sg_lookup_image(&_sg.pools, desc->depth_stencil_attachment.image.id);
-            if (!(att_imgs[ds_att_index] && att_imgs[ds_att_index]->slot.state == SG_RESOURCESTATE_VALID)) {
-                pass->slot.state = SG_RESOURCESTATE_FAILED;
-                return;
-            }
+            /* FIXME: this shouldn't be an assertion, but result in a SG_RESOURCESTATE_FAILED pass */
+            SOKOL_ASSERT(att_imgs[ds_att_index] && att_imgs[ds_att_index]->slot.state == SG_RESOURCESTATE_VALID);
         }
         else {
             att_imgs[ds_att_index] = 0;
@@ -27846,137 +26853,81 @@ _SOKOL_PRIVATE void _sg_init_pass(_sg_pass_t* pass, const sg_pass_desc* desc) {
     SOKOL_ASSERT((pass->slot.state == SG_RESOURCESTATE_VALID)||(pass->slot.state == SG_RESOURCESTATE_FAILED));
 }
 
-_SOKOL_PRIVATE void _sg_uninit_buffer(_sg_buffer_t* buf) {
-    SOKOL_ASSERT(buf && ((buf->slot.state == SG_RESOURCESTATE_VALID) || (buf->slot.state == SG_RESOURCESTATE_FAILED)));
-    if (buf->slot.ctx_id == _sg.active_context.id) {
-        _sg_discard_buffer(buf);
-        _sg_reset_buffer_to_alloc_state(buf);
-    }
-    else {
-        SG_LOG("_sg_uninit_buffer: active context mismatch (must be same as for creation)");
-        _SG_TRACE_NOARGS(err_context_mismatch);
-    }
-}
-
-_SOKOL_PRIVATE void _sg_uninit_image(_sg_image_t* img) {
-    SOKOL_ASSERT(img && ((img->slot.state == SG_RESOURCESTATE_VALID) || (img->slot.state == SG_RESOURCESTATE_FAILED)));
-    if (img->slot.ctx_id == _sg.active_context.id) {
-        _sg_discard_image(img);
-        _sg_reset_image_to_alloc_state(img);
-    }
-    else {
-        SG_LOG("_sg_uninit_image: active context mismatch (must be same as for creation)");
-        _SG_TRACE_NOARGS(err_context_mismatch);
-    }
-}
-
-_SOKOL_PRIVATE void _sg_uninit_shader(_sg_shader_t* shd) {
-    SOKOL_ASSERT(shd && ((shd->slot.state == SG_RESOURCESTATE_VALID) || (shd->slot.state == SG_RESOURCESTATE_FAILED)));
-    if (shd->slot.ctx_id == _sg.active_context.id) {
-        _sg_discard_shader(shd);
-        _sg_reset_shader_to_alloc_state(shd);
-    }
-    else {
-        SG_LOG("_sg_uninit_shader: active context mismatch (must be same as for creation)");
-        _SG_TRACE_NOARGS(err_context_mismatch);
-    }
-}
-
-_SOKOL_PRIVATE void _sg_uninit_pipeline(_sg_pipeline_t* pip) {
-    SOKOL_ASSERT(pip && ((pip->slot.state == SG_RESOURCESTATE_VALID) || (pip->slot.state == SG_RESOURCESTATE_FAILED)));
-    if (pip->slot.ctx_id == _sg.active_context.id) {
-        _sg_discard_pipeline(pip);
-        _sg_reset_pipeline_to_alloc_state(pip);
-    }
-    else {
-        SG_LOG("_sg_uninit_pipeline: active context mismatch (must be same as for creation)");
-        _SG_TRACE_NOARGS(err_context_mismatch);
-    }
-}
-
-_SOKOL_PRIVATE void _sg_uninit_pass(_sg_pass_t* pass) {
-    SOKOL_ASSERT(pass && ((pass->slot.state == SG_RESOURCESTATE_VALID) || (pass->slot.state == SG_RESOURCESTATE_FAILED)));
-    if (pass->slot.ctx_id == _sg.active_context.id) {
-        _sg_discard_pass(pass);
-        _sg_reset_pass_to_alloc_state(pass);
-    }
-    else {
-        SG_LOG("_sg_uninit_pass: active context mismatch (must be same as for creation)");
-        _SG_TRACE_NOARGS(err_context_mismatch);
-    }
-}
-
-_SOKOL_PRIVATE void _sg_setup_commit_listeners(const sg_desc* desc) {
-    SOKOL_ASSERT(desc->max_commit_listeners > 0);
-    SOKOL_ASSERT(0 == _sg.commit_listeners.items);
-    SOKOL_ASSERT(0 == _sg.commit_listeners.num);
-    SOKOL_ASSERT(0 == _sg.commit_listeners.upper);
-    _sg.commit_listeners.num = desc->max_commit_listeners;
-    const size_t size = (size_t)_sg.commit_listeners.num * sizeof(sg_commit_listener);
-    _sg.commit_listeners.items = (sg_commit_listener*)_sg_malloc_clear(size);
-}
-
-_SOKOL_PRIVATE void _sg_discard_commit_listeners(void) {
-    SOKOL_ASSERT(0 != _sg.commit_listeners.items);
-    _sg_free(_sg.commit_listeners.items);
-    _sg.commit_listeners.items = 0;
-}
-
-_SOKOL_PRIVATE void _sg_notify_commit_listeners(void) {
-    SOKOL_ASSERT(_sg.commit_listeners.items);
-    for (int i = 0; i < _sg.commit_listeners.upper; i++) {
-        const sg_commit_listener* listener = &_sg.commit_listeners.items[i];
-        if (listener->func) {
-            listener->func(listener->user_data);
-        }
-    }
-}
-
-_SOKOL_PRIVATE bool _sg_add_commit_listener(const sg_commit_listener* new_listener) {
-    SOKOL_ASSERT(new_listener && new_listener->func);
-    SOKOL_ASSERT(_sg.commit_listeners.items);
-    // first check if the listener hadn't been added already
-    for (int i = 0; i < _sg.commit_listeners.upper; i++) {
-        const sg_commit_listener* slot = &_sg.commit_listeners.items[i];
-        if ((slot->func == new_listener->func) && (slot->user_data == new_listener->user_data)) {
-            SG_LOG("attempting to add identical commit listener\n");
-            return false;
-        }
-    }
-    // first try to plug a hole
-    sg_commit_listener* slot = 0;
-    for (int i = 0; i < _sg.commit_listeners.upper; i++) {
-        if (_sg.commit_listeners.items[i].func == 0) {
-            slot = &_sg.commit_listeners.items[i];
-            break;
-        }
-    }
-    if (!slot) {
-        // append to end
-        if (_sg.commit_listeners.upper < _sg.commit_listeners.num) {
-            slot = &_sg.commit_listeners.items[_sg.commit_listeners.upper++];
-        }
-    }
-    if (!slot) {
-        SG_LOG("commit listener array full\n");
-        return false;
-    }
-    *slot = *new_listener;
-    return true;
-}
-
-_SOKOL_PRIVATE bool _sg_remove_commit_listener(const sg_commit_listener* listener) {
-    SOKOL_ASSERT(listener && listener->func);
-    SOKOL_ASSERT(_sg.commit_listeners.items);
-    for (int i = 0; i < _sg.commit_listeners.upper; i++) {
-        sg_commit_listener* slot = &_sg.commit_listeners.items[i];
-        // both the function pointer and user data must match!
-        if ((slot->func == listener->func) && (slot->user_data == listener->user_data)) {
-            slot->func = 0;
-            slot->user_data = 0;
-            // NOTE: since _sg_add_commit_listener() already catches duplicates,
-            // we don't need to worry about them here
+_SOKOL_PRIVATE bool _sg_uninit_buffer(sg_buffer buf_id) {
+    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
+    if (buf) {
+        if (buf->slot.ctx_id == _sg.active_context.id) {
+            _sg_destroy_buffer(buf);
+            _sg_reset_buffer(buf);
             return true;
+        }
+        else {
+            SOKOL_LOG("_sg_uninit_buffer: active context mismatch (must be same as for creation)");
+            _SG_TRACE_NOARGS(err_context_mismatch);
+        }
+    }
+    return false;
+}
+
+_SOKOL_PRIVATE bool _sg_uninit_image(sg_image img_id) {
+    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
+    if (img) {
+        if (img->slot.ctx_id == _sg.active_context.id) {
+            _sg_destroy_image(img);
+            _sg_reset_image(img);
+            return true;
+        }
+        else {
+            SOKOL_LOG("_sg_uninit_image: active context mismatch (must be same as for creation)");
+            _SG_TRACE_NOARGS(err_context_mismatch);
+        }
+    }
+    return false;
+}
+
+_SOKOL_PRIVATE bool _sg_uninit_shader(sg_shader shd_id) {
+    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
+    if (shd) {
+        if (shd->slot.ctx_id == _sg.active_context.id) {
+            _sg_destroy_shader(shd);
+            _sg_reset_shader(shd);
+            return true;
+        }
+        else {
+            SOKOL_LOG("_sg_uninit_shader: active context mismatch (must be same as for creation)");
+            _SG_TRACE_NOARGS(err_context_mismatch);
+        }
+    }
+    return false;
+}
+
+_SOKOL_PRIVATE bool _sg_uninit_pipeline(sg_pipeline pip_id) {
+    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
+    if (pip) {
+        if (pip->slot.ctx_id == _sg.active_context.id) {
+            _sg_destroy_pipeline(pip);
+            _sg_reset_pipeline(pip);
+            return true;
+        }
+        else {
+            SOKOL_LOG("_sg_uninit_pipeline: active context mismatch (must be same as for creation)");
+            _SG_TRACE_NOARGS(err_context_mismatch);
+        }
+    }
+    return false;
+}
+
+_SOKOL_PRIVATE bool _sg_uninit_pass(sg_pass pass_id) {
+    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
+    if (pass) {
+        if (pass->slot.ctx_id == _sg.active_context.id) {
+            _sg_destroy_pass(pass);
+            _sg_reset_pass(pass);
+            return true;
+        }
+        else {
+            SOKOL_LOG("_sg_uninit_pass: active context mismatch (must be same as for creation)");
+            _SG_TRACE_NOARGS(err_context_mismatch);
         }
     }
     return false;
@@ -28006,7 +26957,6 @@ _SOKOL_PRIVATE sg_desc _sg_desc_defaults(const sg_desc* desc) {
     res.uniform_buffer_size = _sg_def(res.uniform_buffer_size, _SG_DEFAULT_UB_SIZE);
     res.staging_buffer_size = _sg_def(res.staging_buffer_size, _SG_DEFAULT_STAGING_SIZE);
     res.sampler_cache_size = _sg_def(res.sampler_cache_size, _SG_DEFAULT_SAMPLER_CACHE_CAPACITY);
-    res.max_commit_listeners = _sg_def(res.max_commit_listeners, _SG_DEFAULT_MAX_COMMIT_LISTENERS);
     return res;
 }
 
@@ -28019,7 +26969,6 @@ SOKOL_API_IMPL void sg_setup(const sg_desc* desc) {
     _SG_CLEAR_ARC_STRUCT(_sg_state_t, _sg);
     _sg.desc = _sg_desc_defaults(desc);
     _sg_setup_pools(&_sg.pools, &_sg.desc);
-    _sg_setup_commit_listeners(&_sg.desc);
     _sg.frame_index = 1;
     _sg_setup_backend(&_sg.desc);
     _sg.valid = true;
@@ -28034,12 +26983,11 @@ SOKOL_API_IMPL void sg_shutdown(void) {
     if (_sg.active_context.id != SG_INVALID_ID) {
         _sg_context_t* ctx = _sg_lookup_context(&_sg.pools, _sg.active_context.id);
         if (ctx) {
-            _sg_discard_all_resources(&_sg.pools, _sg.active_context.id);
-            _sg_discard_context(ctx);
+            _sg_destroy_all_resources(&_sg.pools, _sg.active_context.id);
+            _sg_destroy_context(ctx);
         }
     }
     _sg_discard_backend();
-    _sg_discard_commit_listeners();
     _sg_discard_pools(&_sg.pools);
     _SG_CLEAR_ARC_STRUCT(_sg_state_t, _sg);
 }
@@ -28096,11 +27044,11 @@ SOKOL_API_IMPL sg_context sg_setup_context(void) {
 
 SOKOL_API_IMPL void sg_discard_context(sg_context ctx_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_discard_all_resources(&_sg.pools, ctx_id.id);
+    _sg_destroy_all_resources(&_sg.pools, ctx_id.id);
     _sg_context_t* ctx = _sg_lookup_context(&_sg.pools, ctx_id.id);
     if (ctx) {
-        _sg_discard_context(ctx);
-        _sg_reset_context_to_alloc_state(ctx);
+        _sg_destroy_context(ctx);
+        _sg_reset_context(ctx);
         _sg_reset_slot(&ctx->slot);
         _sg_pool_free_index(&_sg.pools.context_pool, _sg_slot_index(ctx_id.id));
     }
@@ -28125,7 +27073,7 @@ SOKOL_API_IMPL sg_trace_hooks sg_install_trace_hooks(const sg_trace_hooks* trace
         _sg.hooks = *trace_hooks;
     #else
         static sg_trace_hooks old_hooks;
-        SG_LOG("sg_install_trace_hooks() called, but SG_TRACE_HOOKS is not defined!");
+        SOKOL_LOG("sg_install_trace_hooks() called, but SG_TRACE_HOOKS is not defined!");
     #endif
     return old_hooks;
 }
@@ -28167,302 +27115,152 @@ SOKOL_API_IMPL sg_pass sg_alloc_pass(void) {
 
 SOKOL_API_IMPL void sg_dealloc_buffer(sg_buffer buf_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    if (buf) {
-        if (buf->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_buffer(buf);
-        }
-        else {
-            SG_LOG("sg_dealloc_buffer: buffer must be in ALLOC state\n");
-        }
-    }
+    _sg_dealloc_buffer(buf_id);
     _SG_TRACE_ARGS(dealloc_buffer, buf_id);
 }
 
 SOKOL_API_IMPL void sg_dealloc_image(sg_image img_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
-    if (img) {
-        if (img->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_image(img);
-        }
-        else {
-            SG_LOG("sg_dealloc_image: image must be in ALLOC state\n");
-        }
-    }
+    _sg_dealloc_image(img_id);
     _SG_TRACE_ARGS(dealloc_image, img_id);
 }
 
 SOKOL_API_IMPL void sg_dealloc_shader(sg_shader shd_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
-    if (shd) {
-        if (shd->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_shader(shd);
-        }
-        else {
-            SG_LOG("sg_dealloc_shader: shader must be in ALLOC state\n");
-        }
-    }
+    _sg_dealloc_shader(shd_id);
     _SG_TRACE_ARGS(dealloc_shader, shd_id);
 }
 
 SOKOL_API_IMPL void sg_dealloc_pipeline(sg_pipeline pip_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
-    if (pip) {
-        if (pip->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_pipeline(pip);
-        }
-        else {
-            SG_LOG("sg_dealloc_pipeline: pipeline must be in ALLOC state\n");
-        }
-    }
+    _sg_dealloc_pipeline(pip_id);
     _SG_TRACE_ARGS(dealloc_pipeline, pip_id);
 }
 
 SOKOL_API_IMPL void sg_dealloc_pass(sg_pass pass_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
-    if (pass) {
-        if (pass->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_pass(pass);
-        }
-        else {
-            SG_LOG("sg_dealloc_pass: pass must be in ALLOC state\n");
-        }
-    }
+    _sg_dealloc_pass(pass_id);
     _SG_TRACE_ARGS(dealloc_pass, pass_id);
 }
 
 SOKOL_API_IMPL void sg_init_buffer(sg_buffer buf_id, const sg_buffer_desc* desc) {
     SOKOL_ASSERT(_sg.valid);
     sg_buffer_desc desc_def = _sg_buffer_desc_defaults(desc);
-    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    if (buf) {
-        if (buf->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_init_buffer(buf, &desc_def);
-            SOKOL_ASSERT((buf->slot.state == SG_RESOURCESTATE_VALID) || (buf->slot.state == SG_RESOURCESTATE_FAILED));
-        }
-        else {
-            SG_LOG("sg_init_buffer: buffer must be in alloc state\n");
-        }
-    }
+    _sg_init_buffer(buf_id, &desc_def);
     _SG_TRACE_ARGS(init_buffer, buf_id, &desc_def);
 }
 
 SOKOL_API_IMPL void sg_init_image(sg_image img_id, const sg_image_desc* desc) {
     SOKOL_ASSERT(_sg.valid);
     sg_image_desc desc_def = _sg_image_desc_defaults(desc);
-    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
-    if (img) {
-        if (img->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_init_image(img, &desc_def);
-            SOKOL_ASSERT((img->slot.state == SG_RESOURCESTATE_VALID) || (img->slot.state == SG_RESOURCESTATE_FAILED));
-        }
-        else {
-            SG_LOG("sg_init_image: image must be in alloc state\n");
-        }
-    }
+    _sg_init_image(img_id, &desc_def);
     _SG_TRACE_ARGS(init_image, img_id, &desc_def);
 }
 
 SOKOL_API_IMPL void sg_init_shader(sg_shader shd_id, const sg_shader_desc* desc) {
     SOKOL_ASSERT(_sg.valid);
     sg_shader_desc desc_def = _sg_shader_desc_defaults(desc);
-    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
-    if (shd) {
-        if (shd->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_init_shader(shd, &desc_def);
-            SOKOL_ASSERT((shd->slot.state == SG_RESOURCESTATE_VALID) || (shd->slot.state == SG_RESOURCESTATE_FAILED));
-        }
-        else {
-            SG_LOG("sg_init_shader: shader must be in alloc state\n");
-        }
-    }
+    _sg_init_shader(shd_id, &desc_def);
     _SG_TRACE_ARGS(init_shader, shd_id, &desc_def);
 }
 
 SOKOL_API_IMPL void sg_init_pipeline(sg_pipeline pip_id, const sg_pipeline_desc* desc) {
     SOKOL_ASSERT(_sg.valid);
     sg_pipeline_desc desc_def = _sg_pipeline_desc_defaults(desc);
-    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
-    if (pip) {
-        if (pip->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_init_pipeline(pip, &desc_def);
-            SOKOL_ASSERT((pip->slot.state == SG_RESOURCESTATE_VALID) || (pip->slot.state == SG_RESOURCESTATE_FAILED));
-        }
-        else {
-            SG_LOG("sg_init_pipeline: pipeline must be in alloc state\n");
-        }
-    }
+    _sg_init_pipeline(pip_id, &desc_def);
     _SG_TRACE_ARGS(init_pipeline, pip_id, &desc_def);
 }
 
 SOKOL_API_IMPL void sg_init_pass(sg_pass pass_id, const sg_pass_desc* desc) {
     SOKOL_ASSERT(_sg.valid);
     sg_pass_desc desc_def = _sg_pass_desc_defaults(desc);
-    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
-    if (pass) {
-        if (pass->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_init_pass(pass, &desc_def);
-            SOKOL_ASSERT((pass->slot.state == SG_RESOURCESTATE_VALID) || (pass->slot.state == SG_RESOURCESTATE_FAILED));
-        }
-        else {
-            SG_LOG("sg_init_pass: pass must be in alloc state\n");
-        }
-    }
+    _sg_init_pass(pass_id, &desc_def);
     _SG_TRACE_ARGS(init_pass, pass_id, &desc_def);
 }
 
-SOKOL_API_IMPL void sg_uninit_buffer(sg_buffer buf_id) {
+SOKOL_API_IMPL bool sg_uninit_buffer(sg_buffer buf_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    if (buf) {
-        if ((buf->slot.state == SG_RESOURCESTATE_VALID) || (buf->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_buffer(buf);
-            SOKOL_ASSERT(buf->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        else {
-            SG_LOG("sg_uninit_buffer: buffer must be in VALID or FAILED state\n");
-        }
-    }
+    bool res = _sg_uninit_buffer(buf_id);
     _SG_TRACE_ARGS(uninit_buffer, buf_id);
+    return res;
 }
 
-SOKOL_API_IMPL void sg_uninit_image(sg_image img_id) {
+SOKOL_API_IMPL bool sg_uninit_image(sg_image img_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
-    if (img) {
-        if ((img->slot.state == SG_RESOURCESTATE_VALID) || (img->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_image(img);
-            SOKOL_ASSERT(img->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        else {
-            SG_LOG("sg_uninit_image: image must be in VALID or FAILED state\n");
-        }
-    }
+    bool res = _sg_uninit_image(img_id);
     _SG_TRACE_ARGS(uninit_image, img_id);
+    return res;
 }
 
-SOKOL_API_IMPL void sg_uninit_shader(sg_shader shd_id) {
+SOKOL_API_IMPL bool sg_uninit_shader(sg_shader shd_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
-    if (shd) {
-        if ((shd->slot.state == SG_RESOURCESTATE_VALID) || (shd->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_shader(shd);
-            SOKOL_ASSERT(shd->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        else {
-            SG_LOG("sg_uninit_shader: shader must be in VALID or FAILED state\n");
-        }
-    }
+    bool res = _sg_uninit_shader(shd_id);
     _SG_TRACE_ARGS(uninit_shader, shd_id);
+    return res;
 }
 
-SOKOL_API_IMPL void sg_uninit_pipeline(sg_pipeline pip_id) {
+SOKOL_API_IMPL bool sg_uninit_pipeline(sg_pipeline pip_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
-    if (pip) {
-        if ((pip->slot.state == SG_RESOURCESTATE_VALID) || (pip->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_pipeline(pip);
-            SOKOL_ASSERT(pip->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        else {
-            SG_LOG("sg_uninit_pipeline: pipeline must be in VALID or FAILED state\n");
-        }
-    }
+    bool res = _sg_uninit_pipeline(pip_id);
     _SG_TRACE_ARGS(uninit_pipeline, pip_id);
+    return res;
 }
 
-SOKOL_API_IMPL void sg_uninit_pass(sg_pass pass_id) {
+SOKOL_API_IMPL bool sg_uninit_pass(sg_pass pass_id) {
     SOKOL_ASSERT(_sg.valid);
-    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
-    if (pass) {
-        if ((pass->slot.state == SG_RESOURCESTATE_VALID) || (pass->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_pass(pass);
-            SOKOL_ASSERT(pass->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        else {
-            SG_LOG("sg_uninit_pass: pass must be in VALID or FAILED state\n");
-        }
-    }
+    bool res = _sg_uninit_pass(pass_id);
     _SG_TRACE_ARGS(uninit_pass, pass_id);
+    return res;
 }
 
 /*-- set allocated resource to failed state ----------------------------------*/
 SOKOL_API_IMPL void sg_fail_buffer(sg_buffer buf_id) {
     SOKOL_ASSERT(_sg.valid);
+    SOKOL_ASSERT(buf_id.id != SG_INVALID_ID);
     _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    if (buf) {
-        if (buf->slot.state == SG_RESOURCESTATE_ALLOC) {
-            buf->slot.ctx_id = _sg.active_context.id;
-            buf->slot.state = SG_RESOURCESTATE_FAILED;
-        }
-        else {
-            SG_LOG("sg_fail_buffer: buffer must be in ALLOC state\n");
-        }
-    }
+    SOKOL_ASSERT(buf && buf->slot.state == SG_RESOURCESTATE_ALLOC);
+    buf->slot.ctx_id = _sg.active_context.id;
+    buf->slot.state = SG_RESOURCESTATE_FAILED;
     _SG_TRACE_ARGS(fail_buffer, buf_id);
 }
 
 SOKOL_API_IMPL void sg_fail_image(sg_image img_id) {
     SOKOL_ASSERT(_sg.valid);
+    SOKOL_ASSERT(img_id.id != SG_INVALID_ID);
     _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
-    if (img) {
-        if (img->slot.state == SG_RESOURCESTATE_ALLOC) {
-            img->slot.ctx_id = _sg.active_context.id;
-            img->slot.state = SG_RESOURCESTATE_FAILED;
-        }
-        else {
-            SG_LOG("sg_fail_image: image must be in ALLOC state\n");
-        }
-    }
+    SOKOL_ASSERT(img && img->slot.state == SG_RESOURCESTATE_ALLOC);
+    img->slot.ctx_id = _sg.active_context.id;
+    img->slot.state = SG_RESOURCESTATE_FAILED;
     _SG_TRACE_ARGS(fail_image, img_id);
 }
 
 SOKOL_API_IMPL void sg_fail_shader(sg_shader shd_id) {
     SOKOL_ASSERT(_sg.valid);
+    SOKOL_ASSERT(shd_id.id != SG_INVALID_ID);
     _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
-    if (shd) {
-        if (shd->slot.state == SG_RESOURCESTATE_ALLOC) {
-            shd->slot.ctx_id = _sg.active_context.id;
-            shd->slot.state = SG_RESOURCESTATE_FAILED;
-        }
-        else {
-            SG_LOG("sg_fail_shader: shader must be in ALLOC state\n");
-        }
-    }
+    SOKOL_ASSERT(shd && shd->slot.state == SG_RESOURCESTATE_ALLOC);
+    shd->slot.ctx_id = _sg.active_context.id;
+    shd->slot.state = SG_RESOURCESTATE_FAILED;
     _SG_TRACE_ARGS(fail_shader, shd_id);
 }
 
 SOKOL_API_IMPL void sg_fail_pipeline(sg_pipeline pip_id) {
     SOKOL_ASSERT(_sg.valid);
+    SOKOL_ASSERT(pip_id.id != SG_INVALID_ID);
     _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
-    if (pip) {
-        if (pip->slot.state == SG_RESOURCESTATE_ALLOC) {
-            pip->slot.ctx_id = _sg.active_context.id;
-            pip->slot.state = SG_RESOURCESTATE_FAILED;
-        }
-        else {
-            SG_LOG("sg_fail_pipeline: pipeline must be in ALLOC state\n");
-        }
-    }
+    SOKOL_ASSERT(pip && pip->slot.state == SG_RESOURCESTATE_ALLOC);
+    pip->slot.ctx_id = _sg.active_context.id;
+    pip->slot.state = SG_RESOURCESTATE_FAILED;
     _SG_TRACE_ARGS(fail_pipeline, pip_id);
 }
 
 SOKOL_API_IMPL void sg_fail_pass(sg_pass pass_id) {
     SOKOL_ASSERT(_sg.valid);
+    SOKOL_ASSERT(pass_id.id != SG_INVALID_ID);
     _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
-    if (pass) {
-        if (pass->slot.state == SG_RESOURCESTATE_ALLOC) {
-            pass->slot.ctx_id = _sg.active_context.id;
-            pass->slot.state = SG_RESOURCESTATE_FAILED;
-        }
-        else {
-            SG_LOG("sg_fail_pass: pass must be in ALLOC state\n");
-        }
-    }
+    SOKOL_ASSERT(pass && pass->slot.state == SG_RESOURCESTATE_ALLOC);
+    pass->slot.ctx_id = _sg.active_context.id;
+    pass->slot.state = SG_RESOURCESTATE_FAILED;
     _SG_TRACE_ARGS(fail_pass, pass_id);
 }
 
@@ -28509,13 +27307,10 @@ SOKOL_API_IMPL sg_buffer sg_make_buffer(const sg_buffer_desc* desc) {
     sg_buffer_desc desc_def = _sg_buffer_desc_defaults(desc);
     sg_buffer buf_id = _sg_alloc_buffer();
     if (buf_id.id != SG_INVALID_ID) {
-        _sg_buffer_t* buf = _sg_buffer_at(&_sg.pools, buf_id.id);
-        SOKOL_ASSERT(buf && (buf->slot.state == SG_RESOURCESTATE_ALLOC));
-        _sg_init_buffer(buf, &desc_def);
-        SOKOL_ASSERT((buf->slot.state == SG_RESOURCESTATE_VALID) || (buf->slot.state == SG_RESOURCESTATE_FAILED));
+        _sg_init_buffer(buf_id, &desc_def);
     }
     else {
-        SG_LOG("buffer pool exhausted!");
+        SOKOL_LOG("buffer pool exhausted!");
         _SG_TRACE_NOARGS(err_buffer_pool_exhausted);
     }
     _SG_TRACE_ARGS(make_buffer, &desc_def, buf_id);
@@ -28528,13 +27323,10 @@ SOKOL_API_IMPL sg_image sg_make_image(const sg_image_desc* desc) {
     sg_image_desc desc_def = _sg_image_desc_defaults(desc);
     sg_image img_id = _sg_alloc_image();
     if (img_id.id != SG_INVALID_ID) {
-        _sg_image_t* img = _sg_image_at(&_sg.pools, img_id.id);
-        SOKOL_ASSERT(img && (img->slot.state == SG_RESOURCESTATE_ALLOC));
-        _sg_init_image(img, &desc_def);
-        SOKOL_ASSERT((img->slot.state == SG_RESOURCESTATE_VALID) || (img->slot.state == SG_RESOURCESTATE_FAILED));
+        _sg_init_image(img_id, &desc_def);
     }
     else {
-        SG_LOG("image pool exhausted!");
+        SOKOL_LOG("image pool exhausted!");
         _SG_TRACE_NOARGS(err_image_pool_exhausted);
     }
     _SG_TRACE_ARGS(make_image, &desc_def, img_id);
@@ -28547,13 +27339,10 @@ SOKOL_API_IMPL sg_shader sg_make_shader(const sg_shader_desc* desc) {
     sg_shader_desc desc_def = _sg_shader_desc_defaults(desc);
     sg_shader shd_id = _sg_alloc_shader();
     if (shd_id.id != SG_INVALID_ID) {
-        _sg_shader_t* shd = _sg_shader_at(&_sg.pools, shd_id.id);
-        SOKOL_ASSERT(shd && (shd->slot.state == SG_RESOURCESTATE_ALLOC));
-        _sg_init_shader(shd, &desc_def);
-        SOKOL_ASSERT((shd->slot.state == SG_RESOURCESTATE_VALID) || (shd->slot.state == SG_RESOURCESTATE_FAILED));
+        _sg_init_shader(shd_id, &desc_def);
     }
     else {
-        SG_LOG("shader pool exhausted!");
+        SOKOL_LOG("shader pool exhausted!");
         _SG_TRACE_NOARGS(err_shader_pool_exhausted);
     }
     _SG_TRACE_ARGS(make_shader, &desc_def, shd_id);
@@ -28566,13 +27355,10 @@ SOKOL_API_IMPL sg_pipeline sg_make_pipeline(const sg_pipeline_desc* desc) {
     sg_pipeline_desc desc_def = _sg_pipeline_desc_defaults(desc);
     sg_pipeline pip_id = _sg_alloc_pipeline();
     if (pip_id.id != SG_INVALID_ID) {
-        _sg_pipeline_t* pip = _sg_pipeline_at(&_sg.pools, pip_id.id);
-        SOKOL_ASSERT(pip && (pip->slot.state == SG_RESOURCESTATE_ALLOC));
-        _sg_init_pipeline(pip, &desc_def);
-        SOKOL_ASSERT((pip->slot.state == SG_RESOURCESTATE_VALID) || (pip->slot.state == SG_RESOURCESTATE_FAILED));
+        _sg_init_pipeline(pip_id, &desc_def);
     }
     else {
-        SG_LOG("pipeline pool exhausted!");
+        SOKOL_LOG("pipeline pool exhausted!");
         _SG_TRACE_NOARGS(err_pipeline_pool_exhausted);
     }
     _SG_TRACE_ARGS(make_pipeline, &desc_def, pip_id);
@@ -28585,13 +27371,10 @@ SOKOL_API_IMPL sg_pass sg_make_pass(const sg_pass_desc* desc) {
     sg_pass_desc desc_def = _sg_pass_desc_defaults(desc);
     sg_pass pass_id = _sg_alloc_pass();
     if (pass_id.id != SG_INVALID_ID) {
-        _sg_pass_t* pass = _sg_pass_at(&_sg.pools, pass_id.id);
-        SOKOL_ASSERT(pass && (pass->slot.state == SG_RESOURCESTATE_ALLOC));
-        _sg_init_pass(pass, &desc_def);
-        SOKOL_ASSERT((pass->slot.state == SG_RESOURCESTATE_VALID) || (pass->slot.state == SG_RESOURCESTATE_FAILED));
+        _sg_init_pass(pass_id, &desc_def);
     }
     else {
-        SG_LOG("pass pool exhausted!");
+        SOKOL_LOG("pass pool exhausted!");
         _SG_TRACE_NOARGS(err_pass_pool_exhausted);
     }
     _SG_TRACE_ARGS(make_pass, &desc_def, pass_id);
@@ -28602,80 +27385,40 @@ SOKOL_API_IMPL sg_pass sg_make_pass(const sg_pass_desc* desc) {
 SOKOL_API_IMPL void sg_destroy_buffer(sg_buffer buf_id) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_ARGS(destroy_buffer, buf_id);
-    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    if (buf) {
-        if ((buf->slot.state == SG_RESOURCESTATE_VALID) || (buf->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_buffer(buf);
-            SOKOL_ASSERT(buf->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        if (buf->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_buffer(buf);
-            SOKOL_ASSERT(buf->slot.state == SG_RESOURCESTATE_INITIAL);
-        }
+    if (_sg_uninit_buffer(buf_id)) {
+        _sg_dealloc_buffer(buf_id);
     }
 }
 
 SOKOL_API_IMPL void sg_destroy_image(sg_image img_id) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_ARGS(destroy_image, img_id);
-    _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
-    if (img) {
-        if ((img->slot.state == SG_RESOURCESTATE_VALID) || (img->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_image(img);
-            SOKOL_ASSERT(img->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        if (img->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_image(img);
-            SOKOL_ASSERT(img->slot.state == SG_RESOURCESTATE_INITIAL);
-        }
+    if (_sg_uninit_image(img_id)) {
+        _sg_dealloc_image(img_id);
     }
 }
 
 SOKOL_API_IMPL void sg_destroy_shader(sg_shader shd_id) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_ARGS(destroy_shader, shd_id);
-    _sg_shader_t* shd = _sg_lookup_shader(&_sg.pools, shd_id.id);
-    if (shd) {
-        if ((shd->slot.state == SG_RESOURCESTATE_VALID) || (shd->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_shader(shd);
-            SOKOL_ASSERT(shd->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        if (shd->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_shader(shd);
-            SOKOL_ASSERT(shd->slot.state == SG_RESOURCESTATE_INITIAL);
-        }
+    if (_sg_uninit_shader(shd_id)) {
+        _sg_dealloc_shader(shd_id);
     }
 }
 
 SOKOL_API_IMPL void sg_destroy_pipeline(sg_pipeline pip_id) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_ARGS(destroy_pipeline, pip_id);
-    _sg_pipeline_t* pip = _sg_lookup_pipeline(&_sg.pools, pip_id.id);
-    if (pip) {
-        if ((pip->slot.state == SG_RESOURCESTATE_VALID) || (pip->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_pipeline(pip);
-            SOKOL_ASSERT(pip->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        if (pip->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_pipeline(pip);
-            SOKOL_ASSERT(pip->slot.state == SG_RESOURCESTATE_INITIAL);
-        }
+    if (_sg_uninit_pipeline(pip_id)) {
+        _sg_dealloc_pipeline(pip_id);
     }
 }
 
 SOKOL_API_IMPL void sg_destroy_pass(sg_pass pass_id) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_ARGS(destroy_pass, pass_id);
-    _sg_pass_t* pass = _sg_lookup_pass(&_sg.pools, pass_id.id);
-    if (pass) {
-        if ((pass->slot.state == SG_RESOURCESTATE_VALID) || (pass->slot.state == SG_RESOURCESTATE_FAILED)) {
-            _sg_uninit_pass(pass);
-            SOKOL_ASSERT(pass->slot.state == SG_RESOURCESTATE_ALLOC);
-        }
-        if (pass->slot.state == SG_RESOURCESTATE_ALLOC) {
-            _sg_dealloc_pass(pass);
-            SOKOL_ASSERT(pass->slot.state == SG_RESOURCESTATE_INITIAL);
-        }
+    if (_sg_uninit_pass(pass_id)) {
+        _sg_dealloc_pass(pass_id);
     }
 }
 
@@ -28868,7 +27611,7 @@ SOKOL_API_IMPL void sg_draw(int base_element, int num_elements, int num_instance
     SOKOL_ASSERT(num_instances >= 0);
     #if defined(SOKOL_DEBUG)
         if (!_sg.bindings_valid) {
-            SG_LOG("attempting to draw without resource bindings");
+            SOKOL_LOG("attempting to draw without resource bindings");
         }
     #endif
     if (!_sg.pass_valid) {
@@ -28910,7 +27653,6 @@ SOKOL_API_IMPL void sg_end_pass(void) {
 SOKOL_API_IMPL void sg_commit(void) {
     SOKOL_ASSERT(_sg.valid);
     _sg_commit();
-    _sg_notify_commit_listeners();
     _SG_TRACE_NOARGS(commit);
     _sg.frame_index++;
 }
@@ -28982,23 +27724,6 @@ SOKOL_API_IMPL bool sg_query_buffer_overflow(sg_buffer buf_id) {
     return result;
 }
 
-SOKOL_API_IMPL bool sg_query_buffer_will_overflow(sg_buffer buf_id, size_t size) {
-    SOKOL_ASSERT(_sg.valid);
-    _sg_buffer_t* buf = _sg_lookup_buffer(&_sg.pools, buf_id.id);
-    bool result = false;
-    if (buf) {
-        int append_pos = buf->cmn.append_pos;
-        /* rewind append cursor in a new frame */
-        if (buf->cmn.append_frame_index != _sg.frame_index) {
-            append_pos = 0;
-        }
-        if ((append_pos + _sg_roundup((int)size, 4)) > buf->cmn.size) {
-            result = true;
-        }
-    }
-    return result;
-}
-
 SOKOL_API_IMPL void sg_update_image(sg_image img_id, const sg_image_data* data) {
     SOKOL_ASSERT(_sg.valid);
     _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
@@ -29022,16 +27747,6 @@ SOKOL_API_IMPL void sg_push_debug_group(const char* name) {
 SOKOL_API_IMPL void sg_pop_debug_group(void) {
     SOKOL_ASSERT(_sg.valid);
     _SG_TRACE_NOARGS(pop_debug_group);
-}
-
-SOKOL_API_IMPL bool sg_add_commit_listener(sg_commit_listener listener) {
-    SOKOL_ASSERT(_sg.valid);
-    return _sg_add_commit_listener(&listener);
-}
-
-SOKOL_API_IMPL bool sg_remove_commit_listener(sg_commit_listener listener) {
-    SOKOL_ASSERT(_sg.valid);
-    return _sg_remove_commit_listener(&listener);
 }
 
 SOKOL_API_IMPL sg_buffer_info sg_query_buffer_info(sg_buffer buf_id) {
@@ -80575,29 +79290,11 @@ void ImGui::UpdateDebugToolStackQueries() {}
                 yourself after simgui_setup() is called.
 
             bool disable_paste_override
-                If set to true, sokol_imgui.h will not 'emulate' a Dear Imgui
+                If set to true, sokol_imgui.h will not 'emulate' a Dear Imgui 
                 clipboard paste action on SAPP_EVENTTYPE_CLIPBOARD_PASTED event.
                 This is mainly a hack/workaround to allow external workarounds
                 for making copy/paste work on the web platform. In general,
                 copy/paste support isn't properly fleshed out in sokol_imgui.h yet.
-
-            bool disable_set_mouse_cursor
-                If true, sokol_imgui.h will not control the mouse cursor type
-                by calling sapp_set_mouse_cursor().
-
-            bool disable_windows_resize_from_edges
-                If true, windows can only be resized from the bottom right corner.
-                The default is false, meaning windows can be resized from edges.
-
-            bool write_alpha_channel
-                Set this to true if you want alpha values written to the
-                framebuffer. By default this behavior is disabled to prevent
-                undesired behavior on platforms like the web where the canvas is
-                always alpha-blended with the background.
-
-            simgui_allocator_t allocator
-                Used to override memory allocation functions. See further below
-                for details.
 
     --- At the start of a frame, call:
 
@@ -80638,7 +79335,7 @@ void ImGui::UpdateDebugToolStackQueries() {}
         in your own event handler.
 
         If you want to use the ImGui functions for checking if a key is pressed
-        (e.g. ImGui::IsKeyPressed()) the following helper function to map
+        (e.g. ImGui::IsKeyPressed()) the following helper function to map 
         an sapp_keycode to an ImGuiKey value may be useful:
 
         int simgui_map_keycode(sapp_keycode c);
@@ -80743,9 +79440,12 @@ extern "C" {
     alloc and free function must be provided (e.g. it's not valid to
     override one function but not the other).
 */
+typedef void*(*simgui_malloc_t)(size_t size, void* user_data);
+typedef void(*simgui_free_t)(void* ptr, void* user_data);
+
 typedef struct simgui_allocator_t {
-    void* (*alloc)(size_t size, void* user_data);
-    void (*free)(void* ptr, void* user_data);
+    simgui_malloc_t alloc;
+    simgui_free_t free;
     void* user_data;
 } simgui_allocator_t;
 
@@ -80757,9 +79457,6 @@ typedef struct simgui_desc_t {
     const char* ini_filename;
     bool no_default_font;
     bool disable_paste_override;    // if true, don't send Ctrl-V on EVENTTYPE_CLIPBOARD_PASTED
-    bool disable_set_mouse_cursor;  // if true, don't control the mouse cursor type via sapp_set_mouse_cursor()
-    bool disable_windows_resize_from_edges; // if true, only resize edges from the bottom right corner
-    bool write_alpha_channel;       // if true, alpha values get written into the framebuffer
     simgui_allocator_t allocator;   // optional memory allocation overrides (default: malloc/free)
 } simgui_desc_t;
 
@@ -80819,7 +79516,7 @@ inline void simgui_new_frame(const simgui_frame_desc_t& desc) { return simgui_ne
 #endif
 #ifndef SOKOL_DEBUG
     #ifndef NDEBUG
-        #define SOKOL_DEBUG
+        #define SOKOL_DEBUG (1)
     #endif
 #endif
 #ifndef SOKOL_ASSERT
@@ -82214,13 +80911,9 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     io->ConfigMacOSXBehaviors = _simgui_is_osx();
     io->BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
     #if !defined(SOKOL_IMGUI_NO_SOKOL_APP)
-        if (!_simgui.desc.disable_set_mouse_cursor) {
-            io->BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
-        }
         io->SetClipboardTextFn = _simgui_set_clipboard;
         io->GetClipboardTextFn = _simgui_get_clipboard;
     #endif
-    io->ConfigWindowsResizeFromEdges = !_simgui.desc.disable_windows_resize_from_edges;
 
     /* create sokol-gfx resources */
     sg_push_debug_group("sokol-imgui");
@@ -82347,14 +81040,10 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     pip_desc.sample_count = _simgui.desc.sample_count;
     pip_desc.depth.pixel_format = _simgui.desc.depth_format;
     pip_desc.colors[0].pixel_format = _simgui.desc.color_format;
-    pip_desc.colors[0].write_mask = _simgui.desc.write_alpha_channel ? SG_COLORMASK_RGBA : SG_COLORMASK_RGB;
+    pip_desc.colors[0].write_mask = SG_COLORMASK_RGB;
     pip_desc.colors[0].blend.enabled = true;
     pip_desc.colors[0].blend.src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA;
     pip_desc.colors[0].blend.dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    if (_simgui.desc.write_alpha_channel) {
-        pip_desc.colors[0].blend.src_factor_alpha = SG_BLENDFACTOR_ONE;
-        pip_desc.colors[0].blend.dst_factor_alpha = SG_BLENDFACTOR_ONE;
-    }
     pip_desc.label = "sokol-imgui-pipeline";
     _simgui.pip = sg_make_pipeline(&pip_desc);
 
@@ -82400,27 +81089,6 @@ SOKOL_API_IMPL void simgui_new_frame(const simgui_frame_desc_t* desc) {
         }
         if (!io->WantTextInput && sapp_keyboard_shown()) {
             sapp_show_keyboard(false);
-        }
-        if (!_simgui.desc.disable_set_mouse_cursor) {
-            #if defined(__cplusplus)
-                ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-            #else
-                ImGuiMouseCursor imgui_cursor = igGetMouseCursor();
-            #endif
-            sapp_mouse_cursor cursor = sapp_get_mouse_cursor();
-            switch (imgui_cursor) {
-                case ImGuiMouseCursor_Arrow:        cursor = SAPP_MOUSECURSOR_ARROW; break;
-                case ImGuiMouseCursor_TextInput:    cursor = SAPP_MOUSECURSOR_IBEAM; break;
-                case ImGuiMouseCursor_ResizeAll:    cursor = SAPP_MOUSECURSOR_RESIZE_ALL; break;
-                case ImGuiMouseCursor_ResizeNS:     cursor = SAPP_MOUSECURSOR_RESIZE_NS; break;
-                case ImGuiMouseCursor_ResizeEW:     cursor = SAPP_MOUSECURSOR_RESIZE_EW; break;
-                case ImGuiMouseCursor_ResizeNESW:   cursor = SAPP_MOUSECURSOR_RESIZE_NESW; break;
-                case ImGuiMouseCursor_ResizeNWSE:   cursor = SAPP_MOUSECURSOR_RESIZE_NWSE; break;
-                case ImGuiMouseCursor_Hand:         cursor = SAPP_MOUSECURSOR_POINTING_HAND; break;
-                case ImGuiMouseCursor_NotAllowed:   cursor = SAPP_MOUSECURSOR_NOT_ALLOWED; break;
-                default: break;
-            }
-            sapp_set_mouse_cursor(cursor);
         }
     #endif
     #if defined(__cplusplus)
@@ -82559,8 +81227,8 @@ SOKOL_API_IMPL void simgui_render(void) {
             }
         }
         #if defined(__cplusplus)
-            const size_t vtx_size = (size_t)cl->VtxBuffer.size() * sizeof(ImDrawVert);
-            const size_t idx_size = (size_t)cl->IdxBuffer.size() * sizeof(ImDrawIdx);
+            const size_t vtx_size = cl->VtxBuffer.size() * sizeof(ImDrawVert);
+            const size_t idx_size = cl->IdxBuffer.size() * sizeof(ImDrawIdx);
         #else
             const size_t vtx_size = (size_t)cl->VtxBuffer.Size * sizeof(ImDrawVert);
             const size_t idx_size = (size_t)cl->IdxBuffer.Size * sizeof(ImDrawIdx);
@@ -82726,22 +81394,11 @@ _SOKOL_PRIVATE void _simgui_add_mouse_wheel_event(ImGuiIO* io, float wheel_x, fl
     #endif
 }
 
-_SOKOL_PRIVATE void _simgui_add_sapp_key_event(ImGuiIO* io, sapp_keycode sapp_key, bool down) {
-    const ImGuiKey imgui_key = _simgui_map_keycode(sapp_key);
+_SOKOL_PRIVATE void _simgui_add_key_event(ImGuiIO* io, ImGuiKey key, bool down) {
     #if defined(__cplusplus)
-        io->AddKeyEvent(imgui_key, down);
-        io->SetKeyEventNativeData(imgui_key, (int)sapp_key, 0, -1);
+        io->AddKeyEvent(key, down);
     #else
-        ImGuiIO_AddKeyEvent(io, imgui_key, down);
-        ImGuiIO_SetKeyEventNativeData(io, imgui_key, (int)sapp_key, 0, -1);
-    #endif
-}
-
-_SOKOL_PRIVATE void _simgui_add_imgui_key_event(ImGuiIO* io, ImGuiKey imgui_key, bool down) {
-    #if defined(__cplusplus)
-        io->AddKeyEvent(imgui_key, down);
-    #else
-        ImGuiIO_AddKeyEvent(io, imgui_key, down);
+        ImGuiIO_AddKeyEvent(io, key, down);
     #endif
 }
 
@@ -82754,10 +81411,10 @@ _SOKOL_PRIVATE void _simgui_add_input_character(ImGuiIO* io, uint32_t c) {
 }
 
 _SOKOL_PRIVATE void _simgui_update_modifiers(ImGuiIO* io, uint32_t mods) {
-    _simgui_add_imgui_key_event(io, ImGuiKey_ModCtrl, (mods & SAPP_MODIFIER_CTRL) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiKey_ModShift, (mods & SAPP_MODIFIER_SHIFT) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiKey_ModAlt, (mods & SAPP_MODIFIER_ALT) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiKey_ModSuper, (mods & SAPP_MODIFIER_SUPER) != 0);
+    _simgui_add_key_event(io, ImGuiKey_ModCtrl, (mods & SAPP_MODIFIER_CTRL) != 0);
+    _simgui_add_key_event(io, ImGuiKey_ModShift, (mods & SAPP_MODIFIER_SHIFT) != 0);
+    _simgui_add_key_event(io, ImGuiKey_ModAlt, (mods & SAPP_MODIFIER_ALT) != 0);
+    _simgui_add_key_event(io, ImGuiKey_ModSuper, (mods & SAPP_MODIFIER_SUPER) != 0);
 }
 
 // returns Ctrl or Super, depending on platform
@@ -82842,7 +81499,7 @@ SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
                 sapp_consume_event();
             }
             // it's ok to add ImGuiKey_None key events
-            _simgui_add_sapp_key_event(io, ev->key_code, true);
+            _simgui_add_key_event(io, _simgui_map_keycode(ev->key_code), true);
             break;
         case SAPP_EVENTTYPE_KEY_UP:
             _simgui_update_modifiers(io, ev->modifiers);
@@ -82858,7 +81515,7 @@ SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
                 sapp_consume_event();
             }
             // it's ok to add ImGuiKey_None key events
-            _simgui_add_sapp_key_event(io, ev->key_code, false);
+            _simgui_add_key_event(io, _simgui_map_keycode(ev->key_code), false);
             break;
         case SAPP_EVENTTYPE_CHAR:
             /* on some platforms, special keys may be reported as
@@ -82877,10 +81534,10 @@ SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
         case SAPP_EVENTTYPE_CLIPBOARD_PASTED:
             /* simulate a Ctrl-V key down/up */
             if (!_simgui.desc.disable_paste_override) {
-                _simgui_add_imgui_key_event(io, _simgui_copypaste_modifier(), true);
-                _simgui_add_imgui_key_event(io, ImGuiKey_V, true);
-                _simgui_add_imgui_key_event(io, ImGuiKey_V, false);
-                _simgui_add_imgui_key_event(io, _simgui_copypaste_modifier(), false);
+                _simgui_add_key_event(io, _simgui_copypaste_modifier(), true);
+                _simgui_add_key_event(io, ImGuiKey_V, true);
+                _simgui_add_key_event(io, _simgui_copypaste_modifier(), false);
+                _simgui_add_key_event(io, ImGuiKey_V, false);
             }
             break;
         default:

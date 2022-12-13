@@ -17,7 +17,7 @@ void imgui_app(
     );
 
 // Called by imgui-app unless you override the event callback
-void event(const sapp_event* ev);
+void imgui_app_event(const sapp_event* ev);
 
 
 typedef void* ImTextureID;

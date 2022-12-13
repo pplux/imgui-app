@@ -44,7 +44,7 @@ static void cleanup(void) {
     sg_shutdown();
 }
 
-void event(const sapp_event* ev) {
+void imgui_app_event(const sapp_event* ev) {
     simgui_handle_event(ev);
 }
 
@@ -55,7 +55,7 @@ void imgui_app(std::function<void()> &&frame_func, void (*config_sokol)(sapp_des
     desc.init_cb = init;
     desc.frame_cb = frame;
     desc.cleanup_cb = cleanup;
-    desc.event_cb = event;
+    desc.event_cb = imgui_app_event;
     desc.window_title = "IMGUI APP";
     desc.width = 800;
     desc.height = 600;
@@ -70,7 +70,7 @@ void imgui_app(std::function<void()> &&frame_func, const char *window_title, int
     desc.init_cb = init;
     desc.frame_cb = frame;
     desc.cleanup_cb = cleanup;
-    desc.event_cb = event;
+    desc.event_cb = imgui_app_event;
     desc.window_title = window_title;
     desc.width = width;
     desc.height = height;
